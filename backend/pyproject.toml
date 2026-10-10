@@ -8,6 +8,8 @@ dependencies = [
     "en-core-web-sm",
     "fastapi[standard]>=0.141.1",
     "gunicorn>=26.0.0",
+    "langchain-google-genai>=4.4.0",
+    "langgraph>=1.2.14",
     "lxml>=6.1.1",
     "networkx>=3.4.2",
     "nltk>=3.10.2",
@@ -22,9 +24,43 @@ dependencies = [
 [dependency-groups]
 dev = [
     "coverage>=7.15.4",
+    "numpy>=2.2.6",
+    "openpyxl>=3.1.5",
+    "pandas>=2.3.3",
+    "pyright>=1.1.414",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
+    "ruff>=0.16.10",
+    "sounddevice>=0.5.6",
+    "tabulate>=0.10.0",
+    "types-lxml>=2026.2.16",
 ]
 
 [tool.uv.sources]
 en-core-web-sm = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" }
+
+[tool.pytest.ini_options]
+# Server modules import relative to server/, so tests work from backend/ or backend/server
+pythonpath = ["server"]
+
+[tool.pyright]
+include = ["server"]
+# Server code imports modules relative to server/ (e.g. `from Utils.loader import ...`)
+extraPaths = ["server"]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.10"
+typeCheckingMode = "standard"
+reportMissingModuleSource = "warning"
+executionEnvironments = [
+  { root = "server/Test", extraPaths = ["server"] },
+  { root = "server" },
+]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+src = ["server"]
+
+[tool.ruff.lint]
+extend-select = ["I"]

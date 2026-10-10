@@ -1,7 +1,8 @@
-import requests
 import json
 import os
 import webbrowser
+
+import requests
 
 BASE_URL = "http://127.0.0.1:8000"
 # BASE_URL = "https://projecct-expo-backend-group-90-production.up.railway.app"
@@ -74,8 +75,9 @@ def run_test_multi_building_process_path(building_name_1, start, building_name_2
                     full_svg_url = f"{BASE_URL}{svg_url}"
                     print(f"Opening SVG for {building} ({path_type}): {full_svg_url}")
                     webbrowser.open(full_svg_url)
-        except Exception as e:
-            print(f"Error opening SVG files: {str(e)}")
+        # Non-JSON body or unexpected "files" shape
+        except (ValueError, AttributeError) as e:
+            print(f"Error opening SVG files: {e!s}")
 
 
 def run_test_process_path_custom(type, start, end, preference, building):
@@ -190,5 +192,3 @@ if __name__ == "__main__":
     run_test_text_upload("How do I get to room 301 from room 201?")
     audio_file_path = os.path.join(os.path.dirname(__file__), "example_audio.wav")
     run_test_audio_upload(audio_file_path)
-
-

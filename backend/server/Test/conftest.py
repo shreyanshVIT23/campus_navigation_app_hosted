@@ -1,16 +1,62 @@
-import sys
 import json
+import os
+import shutil
+import sys
+import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
+
 import pytest
+from dotenv import dotenv_values
 from fastapi.testclient import TestClient
-from datetime import datetime
 
 # Ensure server directory is in sys.path
 server_dir = Path(__file__).resolve().parent.parent
 if str(server_dir) not in sys.path:
     sys.path.insert(0, str(server_dir))
 
-from app import app
+# .env settings for data the app writes; tests get temporary copies of these.
+# Read-only inputs (floor maps, assets, the faculty sheet) stay as they are.
+WRITABLE_SETTINGS = (
+    "DB_PATH",
+    "DB_EVENT",
+    "DB_AUTH_PATH",
+    "DB_TEACHER_DATA",
+    "OUTPUT_MAPS_DIR",
+    "AUDIO_DIR",
+)
+test_data_dir = Path(tempfile.mkdtemp(prefix="campus-nav-tests-"))
+
+
+def use_test_copy(setting: str) -> None:
+    configured = os.environ.get(setting) or dotenv_values(server_dir / ".env").get(
+        setting
+    )
+    if not configured:
+        return
+    source = (server_dir / configured).resolve()
+    copy = test_data_dir / source.relative_to(server_dir)
+    if source.is_dir():
+        shutil.copytree(source, copy, dirs_exist_ok=True)
+    elif source.is_file():
+        copy.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, copy)
+    os.environ[setting] = str(copy)
+
+
+def pytest_configure():
+    # Runs before any test module (and so the app and Utils.loader) is imported.
+    # Utils.loader reads os.environ, and load_dotenv() never overrides variables
+    # that are already set, so the app only ever sees the copies.
+    for setting in WRITABLE_SETTINGS:
+        use_test_copy(setting)
+
+
+def pytest_unconfigure():
+    # A file still held open on Windows must not fail the run; the OS cleans
+    # its temp directory anyway
+    shutil.rmtree(test_data_dir, ignore_errors=True)
+
 
 log_dir = Path(__file__).resolve().parent
 
@@ -24,7 +70,7 @@ def log_test_interaction(
     res_data=None,
 ):
     filepath = log_dir / filename
-    timestamp = datetime.now().isoformat()
+    timestamp = datetime.now(timezone.utc).astimezone().isoformat()
     with open(filepath, "a", encoding="utf-8") as f:
         f.write(f"\n{'=' * 60}\n")
         f.write(f"TIMESTAMP   : {timestamp}\n")
@@ -32,7 +78,8 @@ def log_test_interaction(
         if req_data is not None:
             try:
                 f.write(f"REQUEST DATA:\n{json.dumps(req_data, indent=2)}\n")
-            except Exception:
+            # Not JSON-serializable (e.g. bytes or form objects)
+            except (TypeError, ValueError):
                 f.write(f"REQUEST DATA:\n{req_data}\n")
         else:
             f.write("REQUEST DATA: None\n")
@@ -40,7 +87,7 @@ def log_test_interaction(
         if res_data is not None:
             try:
                 f.write(f"RESPONSE:\n{json.dumps(res_data, indent=2)}\n")
-            except Exception:
+            except (TypeError, ValueError):
                 f.write(f"RESPONSE:\n{res_data}\n")
         f.write(f"{'=' * 60}\n")
 
@@ -63,7 +110,8 @@ class LoggingTestClient:
         response = self._client.request(method, url, **kwargs)
         try:
             res_data = response.json()
-        except Exception:
+        # Non-JSON body (e.g. an SVG FileResponse)
+        except ValueError:
             res_data = response.text
         log_test_interaction(
             self.log_filename,
@@ -92,6 +140,9 @@ class LoggingTestClient:
 def client(request):
     stem = request.path.stem if hasattr(request, "path") else "test_suite"
     log_filename = f"{stem}_log.txt"
+    # Imported here, after pytest_configure has pointed the app at test copies
+    from app import app
+
     with TestClient(app) as test_client:
         yield LoggingTestClient(test_client, log_filename)
 

@@ -1,7 +1,8 @@
 // lib/api.js
 // Centralized API client service for Campus Navigator FastAPI Backend
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://campnav.shreyanshpande.work/api';
+// const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://campnav.shreyanshpande.work/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
 
 export { API_BASE_URL };
 
@@ -22,7 +23,7 @@ export function getApiUrl(path) {
  */
 async function fetchApi(endpoint, options = {}) {
   const url = getApiUrl(endpoint);
-  
+
   const headers = {
     ...options.headers,
   };
@@ -129,7 +130,7 @@ export async function cancelRegistration(eventId, cancelData = {}) {
     }
     throw new Error(`Failed to cancel registration (${res.status}): ${detailMsg}`);
   }
-  
+
   const text = await res.text().catch(() => '');
   try {
     return JSON.parse(text);
@@ -501,6 +502,25 @@ export async function sendChatMessage(message) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error(data.detail || data.message || `Failed to send message: ${res.statusText}`);
+  }
+  return data;
+}
+
+/**
+ * Send a recorded voice question (POST /chat/audio)
+ * Body: FormData with field "audio_file" (webm/ogg/wav/... recorded in the browser)
+ * Returns: { response, status, transcript, files? }
+ */
+export async function sendChatAudio(audioBlob, filename = 'voice.webm') {
+  const formData = new FormData();
+  formData.append('audio_file', audioBlob, filename);
+  const res = await fetchApi('/chat/audio', {
+    method: 'POST',
+    body: formData,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || data.message || `Failed to send audio: ${res.statusText}`);
   }
   return data;
 }

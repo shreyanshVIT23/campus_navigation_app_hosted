@@ -1,0 +1,13 @@
+=== TEST SUITE LOG: test_chatbot_langgraph_log.txt ===
+
+============================================================
+TIMESTAMP   : 2026-10-10T10:57:00.813448+05:30
+TESTED ROUTE: POST /reload_knowledge
+REQUEST DATA: None
+STATUS CODE : 200
+RESPONSE:
+{
+  "message": "Knowledge base reloaded successfully",
+  "status": "success"
+}
+============================================================

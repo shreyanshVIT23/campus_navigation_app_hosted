@@ -4,9 +4,38 @@ import style from '@/app/student/Student.module.css'
 import Image from 'next/image';
 import { processPath, multiBuildingProcessPath, customProcessPath, getApiUrl } from '@/lib/api';
 
+const BUILDING_LABELS = {
+    "AB-01": "Academic Block",
+    "Lab-Complex": "Lab Complex",
+};
+
+// What the backend understands as "the nearest toilet of this kind"
+const BATHROOM_REQUESTS = {
+    male: "male toilet",
+    female: "female toilet",
+    any: "toilet",
+};
+
+// 400: what was typed can't be used; 422: the map has no way between the places.
+// The backend's message already says what is wrong, so it is shown as it is.
+const EXPLAINED_STATUSES = [400, 422];
+
+async function routeErrorMessage(response) {
+    const errData = await response.json().catch(() => ({}));
+    const detailMsg = errData.detail || errData.message || errData.error || response.statusText;
+    if (EXPLAINED_STATUSES.includes(response.status)) {
+        return detailMsg;
+    }
+    return `Backend Server Error (${response.status}): ${detailMsg}\n\nSomething went wrong on the server. Please try again later.`;
+}
+
 function ShowPath({ buttonRef }) {
 
-    const preferenceRef = useRef('Stairs');
+    // "" = no preference: the backend picks the shortest route by lift or stairs
+    const [preference, setPreference] = useState("");
+    const [bathroomFor, setBathroomFor] = useState("any");
+    // e.g. "No lift connects floor 1 and floor 2, so this route uses the stairs."
+    const [routeNote, setRouteNote] = useState("");
 
     const [startFloorMap, setStartFloorMap] = useState("");
     const [endFloorMap, setEndFloorMap] = useState("");
@@ -20,29 +49,41 @@ function ShowPath({ buttonRef }) {
     const [svgData, setSvgData] = useState(null);
     const mapRef = useRef(null);
 
-    const [navType, setNavType] = useState(""); // "single" or "multi" or "custom"
+    const [navType, setNavType] = useState(""); // "single", "multi", "bathroom" or "custom"
+    const [building, setBuilding] = useState("AB-01"); // for same-building routes
     const [building1, setBuilding1] = useState("");
     const [building2, setBuilding2] = useState("");
 
 
-    // Function to handle API request
-    const handleSearch = async () => {
+    // Clear maps from a previous search (the inline SVG would otherwise stay on screen)
+    const resetMaps = () => {
         setStartFloorMap('')
         setEndFloorMap('')
+        setStartFloorMapBuilding2('')
+        setEndFloorMapBuilding2('')
+        setSvgData(null)
         setShowBuilding1Maps(true)
+        setRouteNote('')
+    }
 
-        if (!start || !end) {
-            alert("Please enter both start and end floors.");
+    // Function to handle API request
+    const handleSearch = async () => {
+        const destination = navType === 'bathroom' ? BATHROOM_REQUESTS[bathroomFor] : end;
+        if (!start || !destination) {
+            alert(navType === 'bathroom'
+                ? "Please enter where you are now."
+                : "Please enter both start and end locations.");
             return;
         }
+        resetMaps()
 
         setLoading(true);
 
         try {
-            const preference = preferenceRef.current ? preferenceRef.current.value : "Stairs";
-            const response = navType === 'custom' 
-              ? await customProcessPath({ type: "custom", start, end, preference, building: building1 || "AB-01" })
-              : await processPath({ start, end, preference, building: "AB-01" });
+            const request = { start, end: destination, preference: preference || null, building };
+            const response = navType === 'custom'
+              ? await customProcessPath({ type: "custom", ...request })
+              : await processPath(request);
 
             if (response.ok) {
                 const contentType = response.headers.get("Content-Type") || "";
@@ -58,6 +99,7 @@ function ShowPath({ buttonRef }) {
                     setStartFloorMap(data.files?.start_floor || "");
                     setEndFloorMap(data.files?.end_floor || "");
                     setSvgData(null); // Reset SVG data
+                    setRouteNote(data.note || "");
                 } else if (contentType.includes("image/svg+xml")) {
                     // Same Floor - SVG Response
                     const svgText = await response.text();
@@ -68,9 +110,7 @@ function ShowPath({ buttonRef }) {
                     console.error("Unexpected response format");
                 }
             } else {
-                const errData = await response.json().catch(() => ({}));
-                const detailMsg = errData.detail || errData.message || errData.error || response.statusText;
-                alert(`Backend Server Error (${response.status}): ${detailMsg}\n\nPlease check if room/floor "${start}" and "${end}" exist in the backend graph.`);
+                alert(await routeErrorMessage(response));
                 return;
             }
         } catch (error) {
@@ -86,6 +126,19 @@ function ShowPath({ buttonRef }) {
     };
 
     const handleSearchMulti = async () => {
+        if (!start || !end) {
+            alert("Please enter both start and end locations.");
+            return;
+        }
+        if (!building1 || !building2) {
+            alert("Please choose the start building and the destination building.");
+            return;
+        }
+        if (building1 === building2) {
+            alert("Both locations are in the same building. Use 'Same Building' instead.");
+            return;
+        }
+        resetMaps()
         setLoading(true);
         try {
             const response = await multiBuildingProcessPath({
@@ -98,19 +151,15 @@ function ShowPath({ buttonRef }) {
             if (response.ok) {
                 const data = await response.json();
 
-                if (data.files && data.files[building1]) {
-                    setStartFloorMap(data.files[building1].start_floor);
-                    setEndFloorMap(data.files[building1].end_floor);
-                }
-
-                if (data.files && data.files[building2]) {
-                    setStartFloorMapBuilding2(data.files[building2].start_floor);
-                    setEndFloorMapBuilding2(data.files[building2].end_floor);
-                }
+                // Building 1: from your room to its exit; building 2: entrance to your room
+                const files1 = data.files?.[building1] || {};
+                const files2 = data.files?.[building2] || {};
+                setStartFloorMap(files1.start_floor || "");
+                setEndFloorMap(files1.end_floor || "");
+                setStartFloorMapBuilding2(files2.start_floor || "");
+                setEndFloorMapBuilding2(files2.end_floor || "");
             } else {
-                const errData = await response.json().catch(() => ({}));
-                const detailMsg = errData.detail || errData.message || errData.error || response.statusText;
-                alert(`Backend Server Error (${response.status}): ${detailMsg}\n\nTroubleshooting: Please check if the room numbers ("${start}" in ${building1} and "${end}" in ${building2}) exist in the backend database.`);
+                alert(await routeErrorMessage(response));
                 return;
             }
         } catch (error) {
@@ -128,7 +177,7 @@ function ShowPath({ buttonRef }) {
 
 
     const swapBuilding = () => {
-        if (navType == 'single') {
+        if (navType !== 'multi') {
             return
         }
         setShowBuilding1Maps(prev => !prev);
@@ -147,10 +196,14 @@ function ShowPath({ buttonRef }) {
         if (mapRef.current) {
             mapRef.current.style.display = 'none';
         }
-        setEndFloorMap('')
-        setStartFloorMap('')
-        setSvgData('')
+        resetMaps()
     }
+
+    const currentStartMap = showBuilding1Maps ? startFloorMap : startFloorMapBuilding2;
+    const currentEndMap = showBuilding1Maps ? endFloorMap : endFloorMapBuilding2;
+    const shownBuilding = navType === 'multi'
+        ? (showBuilding1Maps ? building1 : building2)
+        : building;
 
     return (
         <div>
@@ -169,6 +222,7 @@ function ShowPath({ buttonRef }) {
                     <option value="" disabled>Select navigation type</option>
                     <option value="single">Same Building</option>
                     <option value="multi">Multi-Building</option>
+                    <option value="bathroom">Nearest Bathroom</option>
                 </select>
 
                 {/* Input with Start Icon */}
@@ -176,24 +230,40 @@ function ShowPath({ buttonRef }) {
                     <Image src="/start.png" alt="Start" width={20} height={20} className="mr-2" />
                     <input
                         type="text"
-                        placeholder="Choose starting location"
+                        placeholder={navType === 'bathroom' ? "Where are you now? (room, cabin or teacher)" : "Choose starting location"}
                         className="w-full outline-none text-black"
                         value={start}
                         onChange={(e) => setStart(e.target.value)}
                     />
                 </div>
 
-                {/* Input with End Icon */}
-                <div className="flex items-center border p-2 rounded-md mb-2 bg-white">
-                    <Image src="/destination.png" alt="End" width={20} height={20} className="mr-2" />
-                    <input
-                        type="text"
-                        placeholder="Choose end location"
-                        className="w-full outline-none text-black"
-                        value={end}
-                        onChange={(e) => setEnd(e.target.value)}
-                    />
-                </div>
+                {/* Input with End Icon (the bathroom finder picks the destination itself) */}
+                {navType !== 'bathroom' && (
+                    <div className="flex items-center border p-2 rounded-md mb-2 bg-white">
+                        <Image src="/destination.png" alt="End" width={20} height={20} className="mr-2" />
+                        <input
+                            type="text"
+                            placeholder="Choose end location"
+                            className="w-full outline-none text-black"
+                            value={end}
+                            onChange={(e) => setEnd(e.target.value)}
+                        />
+                    </div>
+                )}
+
+                {/* Which bathroom: boys (B and some W rooms), girls (G and some W rooms) or whichever is nearest */}
+                {navType === 'bathroom' && (
+                    <select
+                        className="border p-2 rounded-md w-full text-black mb-2"
+                        value={bathroomFor}
+                        onChange={(e) => setBathroomFor(e.target.value)}
+                        aria-label="Bathroom type"
+                    >
+                        <option value="any">Nearest bathroom (any)</option>
+                        <option value="male">Male bathroom</option>
+                        <option value="female">Female bathroom</option>
+                    </select>
+                )}
 
                 {/* Conditional Building Inputs for Multi-Building */}
                 {navType === "multi" && (
@@ -203,7 +273,7 @@ function ShowPath({ buttonRef }) {
                             value={building1}
                             onChange={(e) => setBuilding1(e.target.value)}
                         >
-                            <option value="" disabled>Building Name 1</option>
+                            <option value="" disabled>Start building</option>
                             <option value="AB-01">AB-01</option>
                             <option value="Lab-Complex">Lab-Complex</option>
                         </select>
@@ -212,31 +282,44 @@ function ShowPath({ buttonRef }) {
                             value={building2}
                             onChange={(e) => setBuilding2(e.target.value)}
                         >
-                            <option value="" disabled>Building Name 2</option>
+                            <option value="" disabled>Destination building</option>
                             <option value="AB-01">AB-01</option>
                             <option value="Lab-Complex">Lab-Complex</option>
                         </select>
                     </>
                 )}
 
-                {/* Preference Selector */}
-                {navType === 'single' && (
+                {/* Building selector for same-building routes */}
+                {(navType === "single" || navType === "bathroom") && (
                     <select
-                        type="text"
-                        className="border mt-2 p-2 rounded-md w-full text-black"
-                        ref={preferenceRef}
+                        className="border p-2 rounded-md w-full text-black mb-2"
+                        value={building}
+                        onChange={(e) => setBuilding(e.target.value)}
                     >
-                        <option value="Stairs" hidden defaultChecked>Select preference</option>
-                        <option value="Stairs">Stairs</option>
-                        <option value="Lift">Lift</option>
+                        <option value="AB-01">Academic Block (AB-01)</option>
+                        <option value="Lab-Complex">Lab Complex</option>
+                    </select>
+                )}
+
+                {/* Preference Selector ("" sends no preference: fastest of lift or stairs) */}
+                {(navType === 'single' || navType === 'bathroom') && (
+                    <select
+                        className="border mt-2 p-2 rounded-md w-full text-black"
+                        value={preference}
+                        onChange={(e) => setPreference(e.target.value)}
+                        aria-label="Lift or stairs preference"
+                    >
+                        <option value="">Fastest route (lift or stairs)</option>
+                        <option value="Stairs">Prefer stairs</option>
+                        <option value="Lift">Prefer lift</option>
                     </select>
                 )}
 
                 {/* Search Button */}
                 <button
-                    onClick={navType === 'single' ? handleSearch : handleSearchMulti}
-                    className="bg-blue-500 text-white p-3 rounded-md w-full mt-4 cursor-pointer"
-                    disabled={loading}
+                    onClick={navType === 'multi' ? handleSearchMulti : handleSearch}
+                    className="bg-blue-500 text-white p-3 rounded-md w-full mt-4 cursor-pointer disabled:opacity-50"
+                    disabled={loading || !navType}
                 >
                     {loading ? "Loading..." : "Search"}
                 </button>
@@ -254,15 +337,7 @@ function ShowPath({ buttonRef }) {
                             <Image src='/prev.png' width={25} height={25} alt='previous' style={{ transform: 'rotate(180deg)' }} />
                         </button>
                         <h2 className="font-bold text-xl mb-2">
-                            {
-                                navType === 'single'
-                                    ? 'Academic Block'
-                                    : navType === 'multi'
-                                        ? showBuilding1Maps
-                                            ? (building1 === 'Lab-Complex' ? 'Lab Complex' : 'Academic Block')
-                                            : (building2 === 'Lab-Complex' ? 'Lab Complex' : 'Academic Block')
-                                        : 'Select Navigation Type'
-                            }
+                            {BUILDING_LABELS[shownBuilding] || 'Select Navigation Type'}
                         </h2>
 
                         {/* Swap Button Inside iFrame */}
@@ -282,6 +357,12 @@ function ShowPath({ buttonRef }) {
                         </div>
                     </div>
 
+                    {routeNote && (
+                        <p role="status" className="bg-yellow-100 text-black text-sm px-4 py-2" style={{ borderBottom: '3px solid #000' }}>
+                            {routeNote}
+                        </p>
+                    )}
+
                     <div className='flex'>
                         {/* Start floor */}
                         <div style={{ borderRight: '3px solid #000' }}>
@@ -292,10 +373,13 @@ function ShowPath({ buttonRef }) {
                                 <div dangerouslySetInnerHTML={{ __html: svgData }} className="w-[400px] h-[400px]" />
                             ) : (
                                 // For different floor
-                                <iframe
-                                    src={getApiUrl(showBuilding1Maps ? startFloorMap : startFloorMapBuilding2)}
-                                    className="w-[400px] h-[400px]"
-                                />
+                                currentStartMap && (
+                                    <iframe
+                                        src={getApiUrl(currentStartMap)}
+                                        title="Start floor map"
+                                        className="w-[400px] h-[400px]"
+                                    />
+                                )
 
                             )}
                         </div>
@@ -303,14 +387,14 @@ function ShowPath({ buttonRef }) {
                         {/* End floor */}
 
                         <div>
-                            {!svgData && (
+                            {!svgData && currentEndMap && (
                                 <>
                                     <h1 style={{ borderBottom: '3px solid #000' }} className='text-center font-bold text-xl'>End Location</h1>
                                     <iframe
-                                        src={getApiUrl(showBuilding1Maps ? endFloorMap : endFloorMapBuilding2)}
+                                        src={getApiUrl(currentEndMap)}
+                                        title="End floor map"
                                         className="w-[400px] h-[400px]"
                                     />
-
                                 </>
                             )}
 

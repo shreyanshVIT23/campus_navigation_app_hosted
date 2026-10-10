@@ -1,18 +1,20 @@
-from fastapi import APIRouter, HTTPException, Depends, Request
-from typing import Optional
+import sqlite3
+from collections.abc import Mapping
+from datetime import timedelta
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr
-from datetime import timedelta
-from .helpers import get_db_connection
-from .user_auth_jwt import get_current_user, create_access_token
-import sqlite3
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from Utils.db_access import (
     get_password_users as get_user_credentials,
 )
 from Utils.db_maker import add_login_timestamp
 from Utils.loader import env_variables
-from werkzeug.security import check_password_hash, generate_password_hash
+
+from .helpers import get_db_connection
+from .user_auth_jwt import create_access_token, get_current_user
 
 
 class UserLogin(BaseModel):
@@ -24,18 +26,18 @@ class UserCreate(BaseModel):
     username: str
     password: str
     email: EmailStr
-    mobile_number: Optional[str] = None
-    gender: Optional[str] = None
-    title: Optional[str] = None
-    position: Optional[str] = None
+    mobile_number: str | None = None
+    gender: str | None = None
+    title: str | None = None
+    position: str | None = None
 
 
 class UserUpdate(BaseModel):
-    email: Optional[EmailStr] = None
-    mobile_number: Optional[str] = None
-    gender: Optional[str] = None
-    title: Optional[str] = None
-    position: Optional[str] = None
+    email: EmailStr | None = None
+    mobile_number: str | None = None
+    gender: str | None = None
+    title: str | None = None
+    position: str | None = None
 
 
 class PasswordUpdate(BaseModel):
@@ -77,35 +79,35 @@ async def register_user(user: UserCreate):
     return {"message": "User registered successfully", "user_id": user_id}
 
 
+async def read_login_credentials(request: Request):
+    content_type = request.headers.get("content-type", "")
+
+    if (
+        "application/x-www-form-urlencoded" in content_type
+        or "multipart/form-data" in content_type
+    ):
+        # Starlette already turns a malformed form body into an HTTP 400.
+        body = await request.form()
+    else:
+        try:
+            body = await request.json()
+        except ValueError:
+            return None, None
+
+    if not isinstance(body, Mapping):
+        return None, None
+
+    username = body.get("username")
+    password = body.get("password")
+    if not isinstance(username, str) or not isinstance(password, str):
+        return None, None
+    return username, password
+
+
 @users_router.post("/login")
 async def login(request: Request):
 
-    username = None
-    password = None
-
-    content_type = request.headers.get("content-type", "")
-
-    if "application/json" in content_type:
-        try:
-            data = await request.json()
-            username = data.get("username")
-            password = data.get("password")
-        except Exception:
-            pass
-    elif "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
-        try:
-            form = await request.form()
-            username = form.get("username")
-            password = form.get("password")
-        except Exception:
-            pass
-    else:
-        try:
-            data = await request.json()
-            username = data.get("username")
-            password = data.get("password")
-        except Exception:
-            pass
+    username, password = await read_login_credentials(request)
 
     if not username or not password:
         raise HTTPException(
@@ -146,7 +148,6 @@ async def login(request: Request):
 @users_router.get("/me")
 @users_router.get("/profile")
 async def get_user_profile(current_user_id: str = Depends(get_current_user)):
-
 
     with get_db_connection() as conn:
         cursor = conn.cursor()
@@ -202,19 +203,19 @@ async def update_user_profile(
     user_update: UserUpdate, current_user_id: str = Depends(get_current_user)
 ):
 
-    update_data = {k: v for k, v in user_update.dict().items() if v is not None}
+    update_data = {k: v for k, v in user_update.model_dump().items() if v is not None}
 
     if not update_data:
         return JSONResponse(content={"detail": "No fields to update"}, status_code=400)
 
     try:
-        set_clause = ", ".join([f"{field } = ?" for field in update_data.keys()])
+        set_clause = ", ".join([f"{field} = ?" for field in update_data])
         values = list(update_data.values())
         values.append(current_user_id)
 
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(f"UPDATE users SET {set_clause } WHERE id = ?", values)
+            cursor.execute(f"UPDATE users SET {set_clause} WHERE id = ?", values)
             conn.commit()
 
             cursor.execute(

@@ -1,13 +1,19 @@
-from fastapi import APIRouter, Request, HTTPException, Depends
-from typing import Any
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
+
+from .event_types import (
+    Attendee,
+    EventWithCount,
+    attendee_from_row,
+    event_with_count_from_row,
+)
 from .helpers import (
     create_event,
-    get_event_by_id,
-    update_event,
     delete_event,
-    remove_attendee,
     get_db_connection,
+    get_event_by_id,
+    remove_attendee,
+    update_event,
 )
 from .user_auth_jwt import get_current_user
 
@@ -18,7 +24,7 @@ user_events_router = APIRouter(prefix="/user/events", tags=["user events"])
 @user_events_router.get("/")
 async def list_user_events(
     current_user_id: str = Depends(get_current_user),
-) -> list[dict[str, Any]]:
+) -> list[EventWithCount]:
 
     with get_db_connection() as conn:
         cursor = conn.cursor()
@@ -30,7 +36,7 @@ async def list_user_events(
             GROUP BY events.id
             """
         )
-        events = [dict(row) for row in cursor.fetchall()]
+        events = [event_with_count_from_row(row) for row in cursor.fetchall()]
     return events
 
 
@@ -50,13 +56,13 @@ async def create_user_event(
 @user_events_router.get("/{event_id}")
 async def get_user_event(
     event_id: str, current_user_id: str = Depends(get_current_user)
-) -> dict[str, Any]:
+) -> EventWithCount:
 
     event = get_event_by_id(event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
 
-    return dict(event)
+    return event
 
 
 @user_events_router.put("/{event_id}")
@@ -69,12 +75,8 @@ async def update_user_event(
         raise HTTPException(status_code=404, detail="Event not found")
 
     data = await request.json()
-    result = update_event(event_id, data)
-
-    if isinstance(result, tuple):
-        return JSONResponse(content=result[0], status_code=result[1])
-
-    return dict(result)
+    result, status_code = update_event(event_id, data)
+    return JSONResponse(content=result, status_code=status_code)
 
 
 @user_events_router.delete("/{event_id}")
@@ -93,7 +95,7 @@ async def delete_user_event(
 @user_events_router.get("/{event_id}/attendees")
 async def get_user_event_attendees(
     event_id: str, current_user_id: str = Depends(get_current_user)
-) -> list[dict[str, Any]]:
+) -> list[Attendee]:
 
     event = get_event_by_id(event_id)
     if not event:
@@ -109,7 +111,7 @@ async def get_user_event_attendees(
             """,
             (event_id,),
         )
-        attendees = [dict(row) for row in cursor.fetchall()]
+        attendees = [attendee_from_row(row) for row in cursor.fetchall()]
     return attendees
 
 
@@ -130,4 +132,3 @@ async def delete_user_event_attendee(
 
     result, status_code = remove_attendee(event_id, attendee_id)
     return JSONResponse(content=result, status_code=status_code)
-

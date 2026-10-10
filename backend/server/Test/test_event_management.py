@@ -1,9 +1,10 @@
-import sys
-import requests
 import json
-from tabulate import tabulate
 import logging
-from datetime import datetime, timedelta
+import sys
+from datetime import datetime, timedelta, timezone
+
+import requests
+from tabulate import tabulate
 
 # ============================================================
 # CONFIGURATION
@@ -19,9 +20,12 @@ AUTH_HEADERS = {
 
 LOG_FILE = "client_api_log.txt"
 
+# Network failures, non-JSON bodies, or unexpected response shapes
+CLIENT_ERRORS = (requests.RequestException, ValueError, AttributeError, TypeError)
+
 
 def ensure_authenticated():
-    global ACCESS_TOKEN, AUTH_HEADERS
+    global ACCESS_TOKEN
     endpoint_login = f"{BASE_URL}/user/login"
     endpoint_register = f"{BASE_URL}/user/register"
 
@@ -54,14 +58,11 @@ def ensure_authenticated():
             if token:
                 ACCESS_TOKEN = token
                 AUTH_HEADERS["Authorization"] = f"Bearer {ACCESS_TOKEN}"
-                print(
-                    f"Successfully authenticated test user: {test_user['username']}"
-                )
+                print(f"Successfully authenticated test user: {test_user['username']}")
                 return True
-    except Exception as e:
+    except CLIENT_ERRORS as e:
         print(f"Authentication setup warning: {e}")
     return False
-
 
 
 # ============================================================
@@ -102,7 +103,7 @@ def log_api_interaction(
     response=None,
     error=None,
 ):
-    timestamp = datetime.now().isoformat()
+    timestamp = datetime.now(timezone.utc).astimezone().isoformat()
 
     log_entry = f"\n===== API INTERACTION: {timestamp} =====\n"
 
@@ -124,7 +125,7 @@ def log_api_interaction(
             log_entry += f"RESPONSE (non-JSON):\n{response.text}\n"
 
     if error is not None:
-        log_entry += f"ERROR: {str(error)}\n"
+        log_entry += f"ERROR: {error!s}\n"
 
     log_entry += "=" * 50 + "\n"
 
@@ -208,14 +209,14 @@ def list_events():
         print_response(response)
         return None
 
-    except Exception as e:
+    except CLIENT_ERRORS as e:
         log_api_interaction(
             "GET",
             endpoint,
             error=e,
         )
 
-        print(f"Error: {str(e)}")
+        print(f"Error: {e!s}")
         return None
 
 
@@ -237,10 +238,12 @@ def create_event():
     endpoint = f"{BASE_URL}/user/events/"
 
     # Create a unique title for every test run.
-    current_time = datetime.now().strftime("%H:%M:%S")
+    current_time = datetime.now(timezone.utc).astimezone().strftime("%H:%M:%S")
 
     # Use a future date instead of the old 2025 date.
-    event_date = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
+    event_date = (
+        datetime.now(timezone.utc).astimezone() + timedelta(days=30)
+    ).strftime("%Y-%m-%d")
 
     event_data = {
         "title": f"Python Workshop at {current_time}",
@@ -293,7 +296,7 @@ def create_event():
         print("No event ID found in create response.")
         return None
 
-    except Exception as e:
+    except CLIENT_ERRORS as e:
         log_api_interaction(
             "POST",
             endpoint,
@@ -301,7 +304,7 @@ def create_event():
             error=e,
         )
 
-        print(f"Error: {str(e)}")
+        print(f"Error: {e!s}")
         return None
 
 
@@ -337,14 +340,14 @@ def list_user_events():
 
         return None
 
-    except Exception as e:
+    except CLIENT_ERRORS as e:
         log_api_interaction(
             "GET",
             endpoint,
             error=e,
         )
 
-        print(f"Error: {str(e)}")
+        print(f"Error: {e!s}")
         return None
 
 
@@ -383,14 +386,14 @@ def get_event_details(event_id):
 
         return None
 
-    except Exception as e:
+    except CLIENT_ERRORS as e:
         log_api_interaction(
             "GET",
             endpoint,
             error=e,
         )
 
-        print(f"Error: {str(e)}")
+        print(f"Error: {e!s}")
         return None
 
 
@@ -437,7 +440,7 @@ def update_event(event_id):
 
         return response.status_code == 200
 
-    except Exception as e:
+    except CLIENT_ERRORS as e:
         log_api_interaction(
             "PUT",
             endpoint,
@@ -445,7 +448,7 @@ def update_event(event_id):
             error=e,
         )
 
-        print(f"Error: {str(e)}")
+        print(f"Error: {e!s}")
         return False
 
 
@@ -471,13 +474,12 @@ def register_for_event(event_id):
 
     registration_data = {
         "attendee_name": "Jane Smith",
-        "attendee_email": f"jane.smith_{datetime.now().strftime('%H%M%S')}@example.com",
+        "attendee_email": f"jane.smith_{datetime.now(timezone.utc).astimezone().strftime('%H%M%S')}@example.com",
     }
 
     print(f"\n=== REGISTERING FOR EVENT (ID: {event_id}) ===")
 
     print(json.dumps(registration_data, indent=2))
-
 
     try:
         response = requests.post(
@@ -517,7 +519,7 @@ def register_for_event(event_id):
 
         return first_registration_success and duplicate_registration_failed
 
-    except Exception as e:
+    except CLIENT_ERRORS as e:
         log_api_interaction(
             "POST",
             endpoint,
@@ -525,7 +527,7 @@ def register_for_event(event_id):
             error=e,
         )
 
-        print(f"Error: {str(e)}")
+        print(f"Error: {e!s}")
         return False
 
 
@@ -567,14 +569,14 @@ def get_event_registrations(event_id):
 
         return None
 
-    except Exception as e:
+    except CLIENT_ERRORS as e:
         log_api_interaction(
             "GET",
             endpoint,
             error=e,
         )
 
-        print(f"Error: {str(e)}")
+        print(f"Error: {e!s}")
         return None
 
 
@@ -607,14 +609,14 @@ def delete_event(event_id):
 
         return response.status_code in (200, 204)
 
-    except Exception as e:
+    except CLIENT_ERRORS as e:
         log_api_interaction(
             "DELETE",
             endpoint,
             error=e,
         )
 
-        print(f"Error: {str(e)}")
+        print(f"Error: {e!s}")
         return False
 
 
@@ -626,7 +628,9 @@ def delete_event(event_id):
 def run_demo():
     client_logger.info("\n\n========== STARTING NEW DEMO RUN ==========")
 
-    client_logger.info(f"TIMESTAMP: {datetime.now().isoformat()}")
+    client_logger.info(
+        f"TIMESTAMP: {datetime.now(timezone.utc).astimezone().isoformat()}"
+    )
 
     ensure_authenticated()
 
@@ -761,8 +765,8 @@ def run_demo():
         print(error_msg)
         client_logger.error(error_msg)
 
-    except Exception as e:
-        error_msg = f"Error during demo: {str(e)}"
+    except CLIENT_ERRORS as e:
+        error_msg = f"Error during demo: {e!s}"
 
         print(error_msg)
         client_logger.error(error_msg)
@@ -793,7 +797,9 @@ def test_event_management_pytest(client, auth_headers):
     # 3. Create event
     event_data = {
         "title": "Pytest Event",
-        "date": (datetime.now() + timedelta(days=10)).strftime("%Y-%m-%d"),
+        "date": (datetime.now(timezone.utc).astimezone() + timedelta(days=10)).strftime(
+            "%Y-%m-%d"
+        ),
         "time": "12:00",
         "location": "Pytest Room",
         "capacity": 20,
@@ -820,7 +826,7 @@ def test_event_management_pytest(client, auth_headers):
     # 6. Register for event
     reg_data = {
         "attendee_name": "Test Attendee",
-        "attendee_email": f"attendee_{datetime.now().strftime('%H%M%S')}@example.com",
+        "attendee_email": f"attendee_{datetime.now(timezone.utc).astimezone().strftime('%H%M%S')}@example.com",
     }
     res = client.post(f"/events/{event_id}/register", json=reg_data)
     assert res.status_code == 201
@@ -851,5 +857,3 @@ if __name__ == "__main__":
             pass
 
     run_demo()
-
-

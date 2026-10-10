@@ -1,7 +1,7 @@
 === TEST SUITE LOG: test_event_management_log.txt ===
 
 ============================================================
-TIMESTAMP   : 2026-08-09T16:24:30.208420
+TIMESTAMP   : 2026-10-10T10:57:21.374483+05:30
 TESTED ROUTE: POST /user/register
 REQUEST DATA:
 {
@@ -17,7 +17,7 @@ RESPONSE:
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-08-09T16:24:30.299440
+TIMESTAMP   : 2026-10-10T10:57:21.778729+05:30
 TESTED ROUTE: POST /user/login
 REQUEST DATA:
 {
@@ -28,19 +28,31 @@ STATUS CODE : 200
 RESPONSE:
 {
   "message": "Login successful",
-  "last_login": "2026-08-09T16:24:30.287464",
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxNiIsImV4cCI6MTc4NjI3NDY3MH0.NwD3N2OvIoV4TZdMUdmTyoAYTqXHTP6C7QBEKvJPfJQ",
+  "last_login": "2026-10-10T10:57:21.763707+05:30",
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxNiIsImV4cCI6MTc5MTYxMTg0MX0.wo9XB8OR5YQ3fjztoZNLVG4yAW-1amgNkCn74AjYFK0",
   "token_type": "bearer"
 }
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-08-09T16:24:30.301176
+TIMESTAMP   : 2026-10-10T10:57:21.783770+05:30
 TESTED ROUTE: GET /events/
 REQUEST DATA: None
 STATUS CODE : 200
 RESPONSE:
 [
+  {
+    "id": "9fb9fbce-2835-44f0-816d-f3acc525501b",
+    "title": "Full Coverage Event",
+    "date": "2026-10-14",
+    "time": "14:00",
+    "location": "Main Hall",
+    "capacity": 2,
+    "description": "Comprehensive test event",
+    "created_at": "2026-10-09T16:11:45.067970",
+    "user_id": 79,
+    "registered": 0
+  },
   {
     "id": "e0f441f5-208d-4761-8553-347bf0d4b28f",
     "title": "Hackathon",
@@ -51,27 +63,52 @@ RESPONSE:
     "description": "A cybersecurity Hackathon",
     "created_at": "2025-11-09T18:08:47.625062",
     "user_id": 3,
-    "registered": 3
+    "registered": 4
   }
 ]
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-08-09T16:24:30.303041
+TIMESTAMP   : 2026-10-10T10:57:21.783770+05:30
 TESTED ROUTE: GET /user/events/
 REQUEST DATA: None
 STATUS CODE : 200
 RESPONSE:
-[]
+[
+  {
+    "id": "9fb9fbce-2835-44f0-816d-f3acc525501b",
+    "title": "Full Coverage Event",
+    "date": "2026-10-14",
+    "time": "14:00",
+    "location": "Main Hall",
+    "capacity": 2,
+    "description": "Comprehensive test event",
+    "created_at": "2026-10-09T16:11:45.067970",
+    "user_id": 79,
+    "registered": 0
+  },
+  {
+    "id": "e0f441f5-208d-4761-8553-347bf0d4b28f",
+    "title": "Hackathon",
+    "date": "2025-11-09",
+    "time": "18:08",
+    "location": "AB01-Auditorium",
+    "capacity": 200,
+    "description": "A cybersecurity Hackathon",
+    "created_at": "2025-11-09T18:08:47.625062",
+    "user_id": 3,
+    "registered": 4
+  }
+]
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-08-09T16:24:30.316657
+TIMESTAMP   : 2026-10-10T10:57:21.783770+05:30
 TESTED ROUTE: POST /user/events/
 REQUEST DATA:
 {
   "title": "Pytest Event",
-  "date": "2026-08-19",
+  "date": "2026-10-20",
   "time": "12:00",
   "location": "Pytest Room",
   "capacity": 20,
@@ -80,41 +117,41 @@ REQUEST DATA:
 STATUS CODE : 201
 RESPONSE:
 {
-  "id": "12233868-26d7-4e30-91e9-52d9023e05ad",
+  "id": "f6d34bfc-43d4-44b2-b8f4-e6588d256e8a",
   "title": "Pytest Event",
-  "date": "2026-08-19",
+  "date": "2026-10-20",
   "time": "12:00",
   "location": "Pytest Room",
   "capacity": 20,
   "description": "Created during pytest test run.",
-  "created_at": "2026-08-09T16:24:30.304293",
+  "created_at": "2026-10-10T10:57:21.783770+05:30",
   "user_id": 16
 }
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-08-09T16:24:30.318681
-TESTED ROUTE: GET /user/events/12233868-26d7-4e30-91e9-52d9023e05ad
+TIMESTAMP   : 2026-10-10T10:57:21.802226+05:30
+TESTED ROUTE: GET /user/events/f6d34bfc-43d4-44b2-b8f4-e6588d256e8a
 REQUEST DATA: None
 STATUS CODE : 200
 RESPONSE:
 {
-  "id": "12233868-26d7-4e30-91e9-52d9023e05ad",
+  "id": "f6d34bfc-43d4-44b2-b8f4-e6588d256e8a",
   "title": "Pytest Event",
-  "date": "2026-08-19",
+  "date": "2026-10-20",
   "time": "12:00",
   "location": "Pytest Room",
   "capacity": 20,
   "description": "Created during pytest test run.",
-  "created_at": "2026-08-09T16:24:30.304293",
+  "created_at": "2026-10-10T10:57:21.783770+05:30",
   "user_id": 16,
   "registered": 0
 }
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-08-09T16:24:30.332378
-TESTED ROUTE: PUT /user/events/12233868-26d7-4e30-91e9-52d9023e05ad
+TIMESTAMP   : 2026-10-10T10:57:21.803335+05:30
+TESTED ROUTE: PUT /user/events/f6d34bfc-43d4-44b2-b8f4-e6588d256e8a
 REQUEST DATA:
 {
   "title": "Updated Pytest Event"
@@ -122,40 +159,40 @@ REQUEST DATA:
 STATUS CODE : 200
 RESPONSE:
 {
-  "id": "12233868-26d7-4e30-91e9-52d9023e05ad",
+  "id": "f6d34bfc-43d4-44b2-b8f4-e6588d256e8a",
   "title": "Updated Pytest Event",
-  "date": "2026-08-19",
+  "date": "2026-10-20",
   "time": "12:00",
   "location": "Pytest Room",
   "capacity": 20,
   "description": "Created during pytest test run.",
-  "created_at": "2026-08-09T16:24:30.304293",
+  "created_at": "2026-10-10T10:57:21.783770+05:30",
   "user_id": 16,
   "registered": 0
 }
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-08-09T16:24:30.346175
-TESTED ROUTE: POST /events/12233868-26d7-4e30-91e9-52d9023e05ad/register
+TIMESTAMP   : 2026-10-10T10:57:21.822426+05:30
+TESTED ROUTE: POST /events/f6d34bfc-43d4-44b2-b8f4-e6588d256e8a/register
 REQUEST DATA:
 {
   "attendee_name": "Test Attendee",
-  "attendee_email": "attendee_162430@example.com"
+  "attendee_email": "attendee_105721@example.com"
 }
 STATUS CODE : 201
 RESPONSE:
 {
   "message": "Registration successful",
   "event": {
-    "id": "12233868-26d7-4e30-91e9-52d9023e05ad",
+    "id": "f6d34bfc-43d4-44b2-b8f4-e6588d256e8a",
     "title": "Updated Pytest Event",
-    "date": "2026-08-19",
+    "date": "2026-10-20",
     "time": "12:00",
     "location": "Pytest Room",
     "capacity": 20,
     "description": "Created during pytest test run.",
-    "created_at": "2026-08-09T16:24:30.304293",
+    "created_at": "2026-10-10T10:57:21.783770+05:30",
     "user_id": 16,
     "registered": 1
   }
@@ -163,24 +200,24 @@ RESPONSE:
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-08-09T16:24:30.348673
-TESTED ROUTE: GET /user/events/12233868-26d7-4e30-91e9-52d9023e05ad/attendees
+TIMESTAMP   : 2026-10-10T10:57:21.822426+05:30
+TESTED ROUTE: GET /user/events/f6d34bfc-43d4-44b2-b8f4-e6588d256e8a/attendees
 REQUEST DATA: None
 STATUS CODE : 200
 RESPONSE:
 [
   {
-    "id": "67844891-de75-4cbd-9306-b24c42ab6431",
+    "id": "4564f0cb-6ffa-4d1c-a787-4ceb31aa95ee",
     "attendee_name": "Test Attendee",
-    "attendee_email": "attendee_162430@example.com",
-    "registration_date": "2026-08-09T16:24:30.333854"
+    "attendee_email": "attendee_105721@example.com",
+    "registration_date": "2026-10-10T10:57:21.803335+05:30"
   }
 ]
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-08-09T16:24:30.361942
-TESTED ROUTE: DELETE /user/events/12233868-26d7-4e30-91e9-52d9023e05ad
+TIMESTAMP   : 2026-10-10T10:57:21.822426+05:30
+TESTED ROUTE: DELETE /user/events/f6d34bfc-43d4-44b2-b8f4-e6588d256e8a
 REQUEST DATA: None
 STATUS CODE : 200
 RESPONSE:

@@ -1,7 +1,7 @@
-import webbrowser
+import json
 import subprocess
 import sys
-import json
+import webbrowser
 from pathlib import Path
 
 

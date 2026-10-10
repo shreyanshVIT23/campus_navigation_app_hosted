@@ -1,8 +1,9 @@
-from datetime import datetime
 import sqlite3
 import uuid
-from Utils.loader import env_variables
+from datetime import datetime, timezone
+
 from Utils.db_maker import create_user_db
+from Utils.loader import env_variables
 
 
 def get_db_connection():
@@ -48,7 +49,6 @@ def init_db():
 
     cursor.execute("SELECT COUNT(*) FROM events")
     if cursor.fetchone()[0] == 0:
-
         cursor.execute("SELECT id FROM users LIMIT 1")
         user = cursor.fetchone()
 
@@ -64,7 +64,7 @@ def init_db():
                     "location": "Convention Center",
                     "capacity": 500,
                     "description": "Our flagship annual conference featuring keynote speakers and networking opportunities.",
-                    "created_at": datetime.now().isoformat(),
+                    "created_at": datetime.now(timezone.utc).astimezone().isoformat(),
                     "user_id": user_id,
                 },
                 {
@@ -75,7 +75,7 @@ def init_db():
                     "location": "Downtown Venue",
                     "capacity": 200,
                     "description": "Exclusive launch event for our newest product line with demos and special offers.",
-                    "created_at": datetime.now().isoformat(),
+                    "created_at": datetime.now(timezone.utc).astimezone().isoformat(),
                     "user_id": user_id,
                 },
             ]

@@ -1,10 +1,11 @@
 import json
 import os
-import requests
-import sounddevice as sd
-import numpy as np
 import wave
 import webbrowser
+
+import numpy as np
+import requests
+import sounddevice as sd
 from test_api import BASE_URL
 
 
@@ -26,7 +27,7 @@ def record_audio(file_name, record_seconds, sample_rate=44100, channels=1):
         wf.setframerate(sample_rate)
         wf.writeframes(audio_data.tobytes())
 
-    print(f"Audio saved as {file_name }")
+    print(f"Audio saved as {file_name}")
 
 
 def upload_file_to_api(api_url, file_path):
@@ -61,14 +62,14 @@ def upload_file_to_api(api_url, file_path):
 def open_in_browser(response):
     svg_content = response["files"]
 
-    print(f"Opening start in the default web browser...")
+    print("Opening start in the default web browser...")
     webbrowser.open(
-        f"{BASE_URL }/{svg_content ['start_floor']}",
+        f"{BASE_URL}/{svg_content['start_floor']}",
     )
 
-    print(f"Opening end in the default web browser...")
+    print("Opening end in the default web browser...")
     webbrowser.open(
-        f"{BASE_URL }/{svg_content ['end_floor']}",
+        f"{BASE_URL}/{svg_content['end_floor']}",
     )
 
 

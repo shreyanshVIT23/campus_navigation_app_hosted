@@ -1,6 +1,17 @@
 import re
+import sqlite3
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
+
+from .event_types import (
+    EventResult,
+    EventWithCount,
+    EventWithCountResult,
+    MessageResult,
+    RegistrationResult,
+    event_from_row,
+    event_with_count_from_row,
+)
 from .initialize_event_db import get_db_connection
 
 
@@ -22,7 +33,7 @@ def is_valid_email(email):
 def is_valid_date(date_str):
 
     try:
-        datetime.strptime(date_str, "%Y-%m-%d")
+        datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
         return True
     except ValueError:
         return False
@@ -34,7 +45,18 @@ def is_valid_time(time_str):
     return bool(re.match(pattern, time_str))
 
 
-def get_event_by_id(event_id):
+def parse_capacity(value) -> int | None:
+    # Accepts ints and numeric strings (HTML number inputs); bool is not a capacity.
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    if isinstance(value, str) and value.strip().isdigit():
+        return int(value)
+    return None
+
+
+def get_event_by_id(event_id) -> EventWithCount | None:
 
     if not is_valid_uuid(event_id):
         return None
@@ -51,19 +73,24 @@ def get_event_by_id(event_id):
             """,
             (event_id,),
         )
-        return cursor.fetchone()
+        row = cursor.fetchone()
+    return event_with_count_from_row(row) if row else None
 
 
-def create_event(data):
+def create_event(data) -> EventResult:
 
     required_fields = ["title", "date", "time", "location", "capacity"]
 
     for field in required_fields:
         if field not in data:
-            return {"error": f"Missing required field: {field }"}, 400
+            return {"error": f"Missing required field: {field}"}, 400
 
     if not is_valid_date(data["date"]) or not is_valid_time(data["time"]):
         return {"error": "Invalid date or time format"}, 400
+
+    capacity = parse_capacity(data["capacity"])
+    if capacity is None:
+        return {"error": "Capacity must be a non-negative integer"}, 400
 
     if "user_id" not in data:
         return {"error": "Missing required field: user_id"}, 400
@@ -84,21 +111,21 @@ def create_event(data):
                     data["date"],
                     data["time"],
                     data["location"],
-                    data["capacity"],
+                    capacity,
                     data.get("description", ""),
-                    datetime.now().isoformat(),
+                    datetime.now(timezone.utc).astimezone().isoformat(),
                     data["user_id"],
                 ),
             )
             conn.commit()
 
             cursor.execute("SELECT * FROM events WHERE id = ?", (event_id,))
-            return dict(cursor.fetchone()), 201
-    except Exception as e:
+            return event_from_row(cursor.fetchone()), 201
+    except sqlite3.Error as e:
         return {"error": str(e)}, 500
 
 
-def update_event(event_id, data):
+def update_event(event_id, data) -> EventWithCountResult:
 
     if not is_valid_uuid(event_id):
         return {"error": "Invalid event ID"}, 400
@@ -116,8 +143,13 @@ def update_event(event_id, data):
                 return {"error": "Invalid date format"}, 400
             if field == "time" and not is_valid_time(data[field]):
                 return {"error": "Invalid time format"}, 400
-            update_fields.append(f"{field } = ?")
-            params.append(data[field])
+            value = data[field]
+            if field == "capacity":
+                value = parse_capacity(value)
+                if value is None:
+                    return {"error": "Capacity must be a non-negative integer"}, 400
+            update_fields.append(f"{field} = ?")
+            params.append(value)
 
     if not update_fields:
         return {"error": "No fields to update"}, 400
@@ -128,15 +160,19 @@ def update_event(event_id, data):
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                f"UPDATE events SET {', '.join (update_fields )} WHERE id = ?", params
+                f"UPDATE events SET {', '.join(update_fields)} WHERE id = ?", params
             )
             conn.commit()
-            return get_event_by_id(event_id)
-    except Exception as e:
+    except sqlite3.Error as e:
         return {"error": str(e)}, 500
 
+    updated_event = get_event_by_id(event_id)
+    if not updated_event:
+        return {"error": "Event not found"}, 404
+    return updated_event, 200
 
-def delete_event(event_id):
+
+def delete_event(event_id) -> MessageResult:
 
     if not is_valid_uuid(event_id):
         return {"error": "Invalid event ID"}, 400
@@ -152,11 +188,11 @@ def delete_event(event_id):
             cursor.execute("DELETE FROM events WHERE id = ?", (event_id,))
             conn.commit()
             return {"message": "Event deleted successfully"}, 200
-    except Exception as e:
+    except sqlite3.Error as e:
         return {"error": str(e)}, 500
 
 
-def register_for_event(event_id, data):
+def register_for_event(event_id, data) -> RegistrationResult:
 
     if not is_valid_uuid(event_id):
         return {"error": "Invalid event ID"}, 400
@@ -193,7 +229,7 @@ def register_for_event(event_id, data):
             registration_id = str(uuid.uuid4())
 
             registration_date = data.get(
-                "registration_date", datetime.now().isoformat()
+                "registration_date", datetime.now(timezone.utc).astimezone().isoformat()
             )
             cursor.execute(
                 """
@@ -209,15 +245,16 @@ def register_for_event(event_id, data):
                 ),
             )
             conn.commit()
-            return {
-                "message": "Registration successful",
-                "event": get_event_by_id(event_id),
-            }, 201
-    except Exception as e:
+    except sqlite3.Error as e:
         return {"error": str(e)}, 500
 
+    return {
+        "message": "Registration successful",
+        "event": get_event_by_id(event_id),
+    }, 201
 
-def cancel_registration(event_id, attendee_email):
+
+def cancel_registration(event_id, attendee_email) -> MessageResult:
 
     if not is_valid_uuid(event_id):
         return {"error": "Invalid event ID"}, 400
@@ -236,11 +273,11 @@ def cancel_registration(event_id, attendee_email):
                 return {"error": "Registration not found"}, 404
             conn.commit()
             return {"message": "Registration cancelled successfully"}, 200
-    except Exception as e:
+    except sqlite3.Error as e:
         return {"error": str(e)}, 500
 
 
-def remove_attendee(event_id, registration_id):
+def remove_attendee(event_id, registration_id) -> MessageResult:
 
     if not is_valid_uuid(event_id):
         return {"error": "Invalid event ID"}, 400
@@ -256,6 +293,5 @@ def remove_attendee(event_id, registration_id):
                 return {"error": "Attendee registration not found"}, 404
             conn.commit()
             return {"message": "Attendee removed successfully"}, 200
-    except Exception as e:
+    except sqlite3.Error as e:
         return {"error": str(e)}, 500
-

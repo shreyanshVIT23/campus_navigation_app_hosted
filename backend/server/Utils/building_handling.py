@@ -18,15 +18,16 @@ def get_building_paths(building_name):
         return db_path, floor_map_path, output_map_path
     else:
         raise ValueError(
-            f"Building name '{building_name }' not found in the configuration."
+            f"Building name '{building_name}' not found in the configuration."
         )
 
 
 if __name__ == "__main__":
     building_name = "AB-01"
     try:
-        db_path, floor_map_path = get_building_paths(building_name)
-        print(f"DB Path: {db_path }")
-        print(f"Floor Map Path: {floor_map_path }")
+        db_path, floor_map_path, output_map_path = get_building_paths(building_name)
+        print(f"DB Path: {db_path}")
+        print(f"Floor Map Path: {floor_map_path}")
+        print(f"Output Map Path: {output_map_path}")
     except ValueError as e:
         print(e)

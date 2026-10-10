@@ -1,5 +1,5 @@
 import requests
-import json
+
 from Utils.loader import env_variables
 
 api_key = env_variables.get("gemini_api_key", "")
@@ -17,9 +17,6 @@ data = {
 }
 
 
-
-
-
 def test_gemini_api():
     if not api_key or api_key == "your_gemini_api_key_here":
         print("Skipping Gemini API call: GEMINI_API_KEY is placeholder")
@@ -31,4 +28,3 @@ def test_gemini_api():
 
 if __name__ == "__main__":
     test_gemini_api()
-

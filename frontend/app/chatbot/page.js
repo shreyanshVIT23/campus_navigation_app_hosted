@@ -1,8 +1,27 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";    
-import { uploadAudio, sendChatMessage, getApiUrl } from "@/lib/api";
+import { useRouter } from "next/navigation";
+import { sendChatMessage, sendChatAudio, getApiUrl } from "@/lib/api";
+
+// Formats the backend (Gemini) can transcribe, in order of preference
+const RECORDING_MIME_TYPES = [
+  "audio/webm;codecs=opus",
+  "audio/webm",
+  "audio/ogg;codecs=opus",
+  "audio/ogg",
+];
+
+function pickRecordingMimeType() {
+  if (typeof MediaRecorder === "undefined") return "";
+  return RECORDING_MIME_TYPES.find((type) => MediaRecorder.isTypeSupported(type)) || "";
+}
+
+function fileExtensionFor(mimeType) {
+  if (mimeType.includes("ogg")) return "ogg";
+  if (mimeType.includes("wav")) return "wav";
+  return "webm";
+}
 
 const Chatbot = () => {
   const [messages, setMessages] = useState([]);
@@ -11,100 +30,128 @@ const Chatbot = () => {
   const [startFloorMap, setStartFloorMap] = useState("");
   const [endFloorMap, setEndFloorMap] = useState("");
   const [showStartMap, setShowStartMap] = useState(true);
-  const [svgData, setSvgData] = useState(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const mapRef = useRef(null);
+  const recorderRef = useRef(null);
+  const chunksRef = useRef([]);
 
   useEffect(() => {
     if (inputRef.current) {
       inputRef.current.focus();
     }
+    // Release the microphone if the page is left while recording
+    return () => {
+      const recorder = recorderRef.current;
+      if (recorder && recorder.state !== "inactive") {
+        recorder.stream.getTracks().forEach((track) => track.stop());
+      }
+    };
   }, []);
+
+  const addMessage = (text, sender) => {
+    setMessages((prevMessages) => [...prevMessages, { text, sender }]);
+  };
+
   const toggleMap = () => {
     setShowStartMap((prev) => !prev);
   };
 
-  // checks the message for /upload route
-  function containsFromToAndNumber(sentence) {
-    const fromToPattern = /\b(from\b.*\bto|to\b.*\bfrom)\b/i; // Matches 'from ... to' or 'to ... from'
-    const numberPattern = /\b\d+\b/; // Check if a number exists
-
-    return fromToPattern.test(sentence) && numberPattern.test(sentence);
-  }
-
   const handleMapClose = () => {
     if (mapRef.current) {
-      mapRef.current.style.display = 'none';
+      mapRef.current.style.display = "none";
     }
-    setEndFloorMap('')
-    setStartFloorMap('')
-    setSvgData('')
-  }
+    setEndFloorMap("");
+    setStartFloorMap("");
+  };
+
+  // The assistant returns map links when the answer is a route
+  const showRoute = (files) => {
+    if (!files || !files.start_floor) return;
+    setStartFloorMap(files.start_floor);
+    setEndFloorMap(files.end_floor || "");
+    setShowStartMap(true);
+    if (mapRef.current) {
+      mapRef.current.style.display = "block";
+    }
+  };
 
   const handleSendMessage = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || isSending) return;
 
     const currentInput = input;
-    const newMessage = { text: currentInput, sender: "user" };
-    setMessages((prevMessages) => [...prevMessages, newMessage]);
+    addMessage(currentInput, "user");
     setInput("");
+    setIsSending(true);
 
-    if (containsFromToAndNumber(currentInput)) {
-      // Create a FormData object for upload API
-      const formData = new FormData();
-      formData.append("text", currentInput);
+    try {
+      const data = await sendChatMessage(currentInput);
+      addMessage(data.response || "Sorry, I didn't get a reply.", "server");
+      showRoute(data.files);
+    } catch (error) {
+      console.error("Error sending message:", error);
+      addMessage("Failed to get response from server.", "server");
+    } finally {
+      setIsSending(false);
+    }
+  };
 
-      try {
-        const response = await uploadAudio(formData);
-        if (response.ok) {
-          const contentType = response.headers.get("Content-Type") || "";
+  const sendRecording = async (blob) => {
+    setIsSending(true);
+    try {
+      const data = await sendChatAudio(blob, `voice.${fileExtensionFor(blob.type)}`);
+      addMessage(data.transcript ? `🎤 ${data.transcript}` : "🎤 (voice message)", "user");
+      addMessage(data.response || "Sorry, I didn't get a reply.", "server");
+      showRoute(data.files);
+    } catch (error) {
+      console.error("Error sending voice message:", error);
+      addMessage(error.message || "Failed to send voice message.", "server");
+    } finally {
+      setIsSending(false);
+    }
+  };
 
-          if (contentType.includes("application/json")) {
-            // Complex Path - JSON Response
-            const data = await response.json();
-            if (data.error) {
-              alert(data.error);
-              return;
-            }
-            const serverMessage = { text: "opening map!!", sender: "server" };
-            setMessages((prevMessages) => [...prevMessages, serverMessage]);
-            setStartFloorMap(data.files.start_floor);
-            setEndFloorMap(data.files.end_floor);
-            setSvgData(null); // Reset SVG data
-          } else if (contentType.includes("image/svg+xml")) {
-            // Same Floor - SVG Response
-            const svgText = await response.text();
-            setSvgData(svgText); // Store the SVG text
-            setStartFloorMap(null);
-            setEndFloorMap(null);
-          } else {
-            console.error("Unexpected response format");
-          }
-        } else {
-          console.error("Error fetching path:", response.statusText);
-        }
-      } catch (error) {
-        console.error("Request failed:", error);
-      }
+  const toggleRecording = async () => {
+    if (isRecording) {
+      recorderRef.current?.stop();
+      return;
+    }
+    if (isSending) return;
 
-      if (mapRef.current) {
-        mapRef.current.style.display = 'block';
-      }
-    } else {
-      // Sending request to backend for /chat route
-      try {
-        const data = await sendChatMessage(currentInput);
-        if (data.error) {
-          alert(data.error);
-          return;
-        }
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      addMessage("Voice input isn't supported in this browser.", "server");
+      return;
+    }
 
-        const serverResponseText = data.response || data.message || JSON.stringify(data);
-        const serverMessage = { text: serverResponseText, sender: "server" };
-        setMessages((prevMessages) => [...prevMessages, serverMessage]);
-      } catch (error) {
-        console.error("Error sending message:", error);
-        setMessages((prevMessages) => [...prevMessages, { text: "Failed to get response from server.", sender: "server" }]);
-      }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = pickRecordingMimeType();
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      chunksRef.current = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) chunksRef.current.push(event.data);
+      };
+      recorder.onstop = () => {
+        stream.getTracks().forEach((track) => track.stop());
+        setIsRecording(false);
+        const blob = new Blob(chunksRef.current, {
+          type: recorder.mimeType || mimeType || "audio/webm",
+        });
+        if (blob.size > 0) sendRecording(blob);
+      };
+
+      recorderRef.current = recorder;
+      recorder.start();
+      setIsRecording(true);
+    } catch (error) {
+      console.error("Microphone error:", error);
+      addMessage(
+        error.name === "NotAllowedError"
+          ? "Microphone permission was denied. Please allow it to ask by voice."
+          : "Couldn't start recording.",
+        "server"
+      );
     }
   };
 
@@ -120,6 +167,8 @@ const Chatbot = () => {
     router.push("/student"); // Redirect to "/student"
   };
 
+  const currentMap = showStartMap || !endFloorMap ? startFloorMap : endFloorMap;
+
   return (
     <div className="flex flex-col h-screen w-full mx-auto bg-white shadow-lg rounded-lg border">
       {/* Header */}
@@ -129,11 +178,11 @@ const Chatbot = () => {
           <h2 className="font-bold text-[35px] text-[#000000]">Campus Assistant</h2>
         </div>
         <div className="flex min-w-[8%] justify-between items-center">
-        <Image src="/profile.png" width={50} height={50} alt="logo" />
-        {/* Close button */}
-      <button onClick={handleClose}>
-        <Image src="/Close_White.png" width={50} height={50} alt="close" className="cursor-pointer" />
-      </button>
+          <Image src="/profile.png" width={50} height={50} alt="logo" />
+          {/* Close button */}
+          <button onClick={handleClose}>
+            <Image src="/Close_White.png" width={50} height={50} alt="close" className="cursor-pointer" />
+          </button>
         </div>
       </div>
 
@@ -152,6 +201,11 @@ const Chatbot = () => {
             ))}
           </div>
         ))}
+        {isSending && (
+          <div className="p-3 rounded-lg w-fit bg-gray-200 text-gray-600 mr-auto text-left">
+            Thinking...
+          </div>
+        )}
       </div>
 
       {/* Input & Buttons */}
@@ -159,13 +213,19 @@ const Chatbot = () => {
         onClick={handleFocus}
         className="flex mx-auto mb-[5%] items-center p-2 bg-[rgba(217,217,217,0.5)] rounded-b-lg w-[80%] h-[100px] rounded-[10px] text-[#212529] cursor-text"
       >
-        <Image
-          src="/voice.png"
-          width={50}
-          height={50}
-          alt="logo"
-          className="cursor-pointer"
-        />
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleRecording();
+          }}
+          disabled={isSending && !isRecording}
+          title={isRecording ? "Stop recording and send" : "Ask by voice"}
+          aria-pressed={isRecording}
+          className={`rounded-full p-1 cursor-pointer disabled:opacity-50 ${isRecording ? "ring-4 ring-red-500 animate-pulse" : ""}`}
+        >
+          <Image src="/voice.png" width={50} height={50} alt={isRecording ? "stop recording" : "voice input"} />
+        </button>
 
         <input
           ref={inputRef}
@@ -173,16 +233,16 @@ const Chatbot = () => {
           className="flex-1 p-2 outline-none rounded-lg"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask something..."
+          placeholder={isRecording ? "Listening... click the mic again to send" : "Ask something..."}
           onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-          focus='true'
+          autoFocus
         />
 
         <Image
           src="/send.png"
           width={50}
           height={50}
-          alt="logo"
+          alt="send"
           className="cursor-pointer"
           onClick={handleSendMessage}
         />
@@ -190,33 +250,33 @@ const Chatbot = () => {
       <div className="flex gap-6 mt-6 absolute top-5 left-150 z-50 text-black">
         {/* Map Container */}
         <div ref={mapRef} className="relative hidden bg-white p-4 shadow-md rounded-lg">
-          <h2 className="font-bold mb-2">{showStartMap ? "Start Floor Map" : "End Floor Map"}</h2>
+          <h2 className="font-bold mb-2">
+            {showStartMap || !endFloorMap ? "Start Floor Map" : "End Floor Map"}
+          </h2>
 
-          {/* Swap Button Inside iFrame */}
-          <button
-            onClick={toggleMap}
-            className="absolute top-2 right-16 bg-gray-300 p-2 rounded-md shadow-md z-10 cursor-pointer"
-          >
-            🔄 Swap Map
-          </button>
+          {/* Swap only when the route spans two floors */}
+          {endFloorMap && (
+            <button
+              onClick={toggleMap}
+              className="absolute top-2 right-16 bg-gray-300 p-2 rounded-md shadow-md z-10 cursor-pointer"
+            >
+              🔄 Swap Map
+            </button>
+          )}
           <button
             onClick={handleMapClose}
             className="absolute top-2 right-2 bg-gray-300 p-2 rounded-md shadow-md z-10 cursor-pointer"
           >
-            <Image src='/Close.png' width={30} height={30} alt='close' />
+            <Image src="/Close.png" width={30} height={30} alt="close" />
           </button>
 
-          {svgData ? (
-            // Display SVG directly for same floor
-            <div dangerouslySetInnerHTML={{ __html: svgData }} className="w-[500px] h-[500px] border rounded-lg" />
-          ) : (
-            // For different floor
+          {currentMap && (
             <iframe
-              src={getApiUrl(showStartMap ? startFloorMap : endFloorMap)}
+              src={getApiUrl(currentMap)}
+              title="Route map"
               className="w-[500px] h-[500px] border rounded-lg"
             />
           )}
-
         </div>
       </div>
     </div>

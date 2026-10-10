@@ -1,0 +1,21 @@
+=== TEST SUITE LOG: test_connector_fallback_log.txt ===
+
+============================================================
+TIMESTAMP   : 2026-10-10T10:57:20.973985+05:30
+TESTED ROUTE: POST /process_path
+REQUEST DATA:
+{
+  "start": "101",
+  "end": "201",
+  "preference": "Stairs",
+  "building": "Lab-Complex"
+}
+STATUS CODE : 200
+RESPONSE:
+{
+  "files": {
+    "start_floor": "/load_shortest_path_svg?floor=1&building=Lab-Complex",
+    "end_floor": "/load_shortest_path_svg?floor=2&building=Lab-Complex"
+  }
+}
+============================================================

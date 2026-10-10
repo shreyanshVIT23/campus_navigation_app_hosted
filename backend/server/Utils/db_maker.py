@@ -1,12 +1,11 @@
-import sqlite3
-import re
 import os
-from . import extractor
-from typing import List, Tuple
-from . import loader
-from .db_shortest_path_maker import is_valid_digit as dbs
+import re
+import sqlite3
+from datetime import datetime, timezone
+
+from . import extractor, loader
 from . import svg_manipulator as svg_man
-from datetime import datetime
+from .db_shortest_path_maker import is_valid_digit as dbs
 
 
 def create_database(cursor):
@@ -78,12 +77,12 @@ def insert_coordinates(coordinates, cursor, floor):
         )
 
     print(
-        f"{len (coordinates )} coordinates inserted successfully into the anchor_point_coordinates table."
+        f"{len(coordinates)} coordinates inserted successfully into the anchor_point_coordinates table."
     )
 
 
 def insert_descriptions_from_connections(
-    connections: List[Tuple[Tuple[Tuple[float, float], Tuple[float, float]], float]],
+    connections: list[tuple[tuple[tuple[float, float], tuple[float, float]], float]],
     cursor,
     floor: int,
 ):
@@ -108,7 +107,6 @@ def insert_descriptions_from_connections(
 
     unique_point_ids = []
     for x, y in unique_coordinates:
-
         cursor.execute(
             """
             SELECT id FROM anchor_point_coordinates 
@@ -121,7 +119,6 @@ def insert_descriptions_from_connections(
         if result:
             point_id = result[0]
         else:
-
             cursor.execute(
                 """
                 INSERT INTO anchor_point_coordinates (x_coordinate, y_coordinate, floor) 
@@ -141,14 +138,14 @@ def insert_descriptions_from_connections(
             """,
             (
                 anchor_id,
-                f"Anchor at ({x }, {y })",
+                f"Anchor at ({x}, {y})",
                 "Unique anchor point",
                 "Auto-generated description",
             ),
         )
 
     print(
-        f"{len (unique_point_ids )} unique anchor points inserted into anchor_point_description."
+        f"{len(unique_point_ids)} unique anchor points inserted into anchor_point_description."
     )
 
 
@@ -164,7 +161,6 @@ def insert_connections(connections, cursor):
     skipped_connections = []
 
     for (start_point, end_point), distance in connections:
-
         if start_point == end_point:
             skipped_connections.append((start_point, end_point, distance))
             continue
@@ -186,10 +182,10 @@ def insert_connections(connections, cursor):
     if skipped_connections:
         print("Skipped connections:")
         for connection in skipped_connections:
-            print(f"  {connection }")
+            print(f"  {connection}")
 
     print(
-        f"{len (connections )-len (skipped_connections )} connections inserted successfully into the connections table."
+        f"{len(connections) - len(skipped_connections)} connections inserted successfully into the connections table."
     )
 
 
@@ -269,12 +265,10 @@ def add_user(username, password, db_path):
                 (username, password),
             )
             conn.commit()
-            return {"message": f"User '{username }' added successfully."}
+            return {"message": f"User '{username}' added successfully."}
     except sqlite3.IntegrityError:
-
-        return {"error": f"Username '{username }' already exists."}
-    except Exception as e:
-
+        return {"error": f"Username '{username}' already exists."}
+    except sqlite3.Error as e:
         return {"error": str(e)}
 
 
@@ -288,20 +282,19 @@ def add_login_timestamp(username, db_path):
 
             if user:
                 user_id = user[0]
-                timestamp = datetime.now().isoformat()
+                timestamp = datetime.now(timezone.utc).astimezone().isoformat()
                 cursor.execute(
                     "INSERT INTO login_timestamps (user_id, login_time) VALUES (?, ?)",
                     (user_id, timestamp),
                 )
                 conn.commit()
                 return {
-                    "message": f"Login timestamp for user '{username }' added at {timestamp }.",
+                    "message": f"Login timestamp for user '{username}' added at {timestamp}.",
                     "last_login": timestamp,
                 }
             else:
-                return {"error": f"User '{username }' not found."}
-    except Exception as e:
-
+                return {"error": f"User '{username}' not found."}
+    except sqlite3.Error as e:
         return {"error": str(e)}
 
 
@@ -326,7 +319,7 @@ def get_login_timestamps(username, db_path):
             )
             return cursor.fetchall()
         else:
-            print(f"Error: User '{username }' not found.")
+            print(f"Error: User '{username}' not found.")
             return []
 
 
@@ -336,9 +329,9 @@ def delete_user(username, db_path):
         cursor.execute("DELETE FROM users WHERE username = ?", (username,))
         if cursor.rowcount > 0:
             return {
-                "message": f"User '{username }' and their login timestamps have been deleted."
+                "message": f"User '{username}' and their login timestamps have been deleted."
             }
-        return {"error": f"User '{username }' not found."}
+        return {"error": f"User '{username}' not found."}
 
 
 def find_closest_text_and_update_db(svg_data, cursor, floor):
@@ -362,7 +355,7 @@ def find_closest_text_and_update_db(svg_data, cursor, floor):
         match = re.match(r"(T\d{3})([A-Za-z0-9]+)", input_str)
         if match:
             room_no, section_no = match.groups()
-            return f"{room_no }({section_no })"
+            return f"{room_no}({section_no})"
         else:
             return input_str
 
@@ -396,12 +389,11 @@ def find_closest_text_and_update_db(svg_data, cursor, floor):
                         numeric_text = transform_room_section(text)
 
             if numeric_text:
-                extra_info = f"{closest_text }{numeric_text }"
+                extra_info = f"{closest_text}{numeric_text}"
             else:
                 extra_info = closest_text
 
         if "Lift" in closest_text or "Stair" in closest_text:
-
             nearby_texts = sorted(
                 svg_data, key=lambda t: calculate_distance(t[1], t[2], x, y)
             )[:8]
@@ -428,7 +420,7 @@ def find_closest_text_and_update_db(svg_data, cursor, floor):
                 (
                     closest_text,
                     (
-                        f"{extra_info } | {lift_stair_info }"
+                        f"{extra_info} | {lift_stair_info}"
                         if lift_stair_info
                         else extra_info
                     ),
@@ -438,7 +430,6 @@ def find_closest_text_and_update_db(svg_data, cursor, floor):
 
 
 if __name__ == "__main__":
-
     floor = loader.env_variables["floor_map"] / "AB-01"
     db_path = loader.env_variables["db_path"] / "ab01-01.db"
     for filename in os.listdir(floor):

@@ -1,8 +1,9 @@
-import os
-import httpx
 import asyncio
-import logging
 import json
+import logging
+import os
+
+import httpx
 
 # Remove existing log file if present and create a new one
 log_file = "api_test_log_events.txt"
@@ -14,6 +15,8 @@ except FileNotFoundError:
 
 # Configure block-style logging
 logging.basicConfig(filename=log_file, level=logging.INFO, format="%(message)s")
+
+logger = logging.getLogger(__name__)
 
 BASE_URL = "http://127.0.0.1:8000"
 
@@ -47,7 +50,7 @@ def format_log_block(endpoint, method, status, success, response):
         f"Response   : {json.dumps(response, indent=2)}\n"
         f"{'=' * 60}\n"
     )
-    logging.info(block)
+    logger.info(block)
 
 
 # ================================
@@ -84,7 +87,10 @@ async def helper_login_user(client):
             token = res.json().get("access_token")
             await client.put(
                 f"{BASE_URL}/user/password",
-                json={"current_password": "NewTest@1234", "new_password": sample_user["password"]},
+                json={
+                    "current_password": "NewTest@1234",
+                    "new_password": sample_user["password"],
+                },
                 headers={"Authorization": f"Bearer {token}"},
             )
     format_log_block(endpoint, "POST", res.status_code, res.is_success, res.json())
@@ -197,8 +203,9 @@ async def helper_register_for_event(client, event_id: str):
 async def safe_call(label, coro):
     try:
         await coro
-    except Exception as e:
-        logging.error(f"\n{'!' * 60}\n[ERROR] {label} failed: {e}\n{'!' * 60}\n")
+    # Network failures, non-JSON bodies, or unexpected response shapes
+    except (httpx.HTTPError, ValueError, AttributeError) as e:
+        logger.error(f"\n{'!' * 60}\n[ERROR] {label} failed: {e}\n{'!' * 60}\n")
 
 
 # ================================
@@ -216,7 +223,9 @@ async def run_all_tests():
                 safe_call("Login History", helper_login_history(client, token)),
             )
 
-            await safe_call("Update Password", helper_update_user_password(client, token))
+            await safe_call(
+                "Update Password", helper_update_user_password(client, token)
+            )
 
             event_id = await helper_create_event(client, token)
             if event_id:
@@ -231,7 +240,9 @@ async def run_all_tests():
                     ),
                 )
                 await asyncio.gather(
-                    safe_call("List User Events", helper_list_user_events(client, token)),
+                    safe_call(
+                        "List User Events", helper_list_user_events(client, token)
+                    ),
                     safe_call(
                         "Get Specific User Event",
                         helper_get_user_event(client, token, event_id),
@@ -246,15 +257,20 @@ async def run_all_tests():
                     ),
                 )
                 await safe_call(
-                    "Delete User Event", helper_delete_user_event(client, token, event_id)
+                    "Delete User Event",
+                    helper_delete_user_event(client, token, event_id),
                 )
 
         await safe_call("Public Events List", helper_public_event_list(client))
-        await safe_call("Delete User Profile", helper_delete_user_profile(client, token))
+        if token:
+            await safe_call(
+                "Delete User Profile", helper_delete_user_profile(client, token)
+            )
 
 
 def test_new_event_pytest_entry(client):
     res = client.post("/user/register", json=sample_user)
+    assert res.status_code in (200, 409)  # 409 when the user already exists
     res_login = client.post(
         "/user/login",
         json={"username": sample_user["username"], "password": sample_user["password"]},
@@ -294,4 +310,3 @@ def test_new_event_pytest_entry(client):
 
 if __name__ == "__main__":
     asyncio.run(run_all_tests())
-

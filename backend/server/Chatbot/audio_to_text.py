@@ -1,64 +1,77 @@
+import asyncio
 import io
-import spacy
-import speech_recognition as sr
+import os
 import re
 import sqlite3
-from rapidfuzz import process, fuzz
+from pathlib import Path
+
 import nltk
+import spacy
+from fastapi import HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import FileResponse
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
-import os
-from pathlib import Path
+from rapidfuzz import fuzz, process
+from typing_extensions import TypedDict
 from werkzeug.datastructures import FileStorage
-from Chatbot.__init__ import env_variables, process_data
 
-# Set up NLTK data path
+from Chatbot.__init__ import env_variables, process_data
+from Chatbot.navigation_tools import extract_room_numbers
+from Chatbot.transcription import recognize_wav
+from Utils.api_types import ErrorBody
+from Utils.route_types import PathFilesResponse
+
+# Keys (including the space in "Phone Number") match the /search_teacher response
+TeacherMatch = TypedDict(
+    "TeacherMatch",
+    {
+        "Matched_Name": str,
+        "Cabin": str | None,
+        "Room_No": str | None,
+        "Phone Number": str | None,
+    },
+)
+
+PathProcessResult = tuple[PathFilesResponse | FileResponse | ErrorBody, int]
+
+# NLTK data used here: word_tokenize -> punkt_tab, stopwords.words -> stopwords
+NLTK_RESOURCES = {
+    "tokenizers/punkt_tab": "punkt_tab",
+    "corpora/stopwords": "stopwords",
+}
+
+
+def ensure_nltk_data(download_dir: str | None = None):
+    for resource_path, package in NLTK_RESOURCES.items():
+        try:
+            nltk.data.find(resource_path)
+        except LookupError:
+            nltk.download(
+                package, download_dir=download_dir, quiet=True, raise_on_error=True
+            )
+
+
 if os.getenv("DOCKER_ENV") or os.path.exists("/.dockerenv"):
     nltk_data_dir = "./nltk_data"
     nltk.data.path = [nltk_data_dir]
-    try:
-        nltk.data.find("tokenizers/punkt")
-    except LookupError:
-        nltk.download("punkt", download_dir=nltk_data_dir)
-        nltk.download("stopwords", download_dir=nltk_data_dir)
-        nltk.download("punkt_tab", download_dir=nltk_data_dir)
+    ensure_nltk_data(nltk_data_dir)
 else:
-    nltk.download("punkt", quiet=True)
+    ensure_nltk_data()
 
 
 class AudioProcessor:
     def __init__(self):
         self.nlp = spacy.load("en_core_web_sm")
-        self.recognizer = sr.Recognizer()
 
     def audio_to_text(self, file_path: str) -> str:
         if not Path(file_path).is_file():
             return "Error: The specified audio file was not found."
-
-        try:
-            with sr.AudioFile(file_path) as source:
-                print("Loading audio file...")
-                audio_data = self.recognizer.record(source)
-            print("Converting speech to text...")
-            return self.recognizer.recognize_google(audio_data)
-        except sr.UnknownValueError:
-            return "Error: Speech in the audio file could not be understood."
-        except sr.RequestError as e:
-            return f"Error: Could not connect to Google Speech Recognition service: {e}"
-        except Exception as e:
-            return f"Unexpected error: {e}"
+        return recognize_wav(file_path)
 
     @staticmethod
     def extract_3_digit_numbers(text: str) -> list[int]:
-        pattern_3_digit = r"\b\d{3}\b"
-        result = [int(match) for match in re.findall(pattern_3_digit, text)[:2]]
-
-        pattern_4_digit = r"\b2(\d{3})\b"
-        match_4_digit = re.search(pattern_4_digit, text)
-        if match_4_digit:
-            result.insert(1, int(match_4_digit.group(1)))
-
-        return result
+        return extract_room_numbers(text)
 
     @staticmethod
     def preprocess_query(query):
@@ -74,7 +87,7 @@ class AudioProcessor:
 
     def get_teacher_details_with_preprocessing(
         self, teacher_name, db_path=env_variables["teacher_des"]
-    ):
+    ) -> TeacherMatch | ErrorBody:
         conn = None
         try:
             teacher_name = re.sub(r"[^\w\s]", "", teacher_name)
@@ -102,7 +115,7 @@ class AudioProcessor:
 
             names = [row[0] for row in records]
 
-            match, score, index = process.extractOne(
+            _, score, index = process.extractOne(
                 preprocessed_name, names, scorer=fuzz.token_set_ratio
             )
 
@@ -124,30 +137,25 @@ class AudioProcessor:
 
     @staticmethod
     def open_audio_as_filestorage(file_path):
+        resolved_path = Path(__file__).parent / file_path
         try:
-            prev = os.getcwd()
-            script_dir = Path(__file__).parent
-            os.chdir(script_dir)
-            with open(file_path, "rb") as audio_file:
-                file_content = audio_file.read()
-                print(file_path.split("/")[-1])
-                file_storage = FileStorage(io.BytesIO(file_content))
-            os.chdir(prev)
-            return file_storage
-        except Exception as e:
+            file_content = resolved_path.read_bytes()
+        except OSError as e:
             print(f"Error opening file: {e}")
             return None
+        print(resolved_path.name)
+        return FileStorage(io.BytesIO(file_content))
 
     async def process(
         self,
-        audio_file: FileStorage = None,
-        audio_loc: str = None,
-        text: str = None,
-        db_path: str = env_variables.get("teacher_des"),
-        audio_path: str = env_variables.get("audio_path"),
+        audio_file: UploadFile | None = None,
+        audio_loc: str | None = None,
+        text: str | None = None,
+        db_path: str | Path = env_variables["teacher_des"],
+        audio_path: str | Path = env_variables["audio_path"],
         building: str = "AB-01",
-    ):
-        db_path = Path(db_path).resolve()
+    ) -> ErrorBody | PathProcessResult:
+        resolved_db_path = Path(db_path).resolve()
         script_dir = Path(__file__).parent
         temp_audio_dir = audio_path
 
@@ -163,11 +171,13 @@ class AudioProcessor:
                     raise ValueError(
                         "Either audio file or text input must be provided."
                     )
-                audio_path_resolved = Path(temp_audio_dir) / audio_file.filename
+                audio_path_resolved = Path(temp_audio_dir) / (
+                    audio_file.filename or "uploaded_audio.wav"
+                )
                 audio_path_resolved.parent.mkdir(parents=True, exist_ok=True)
 
-                with open(audio_path_resolved, "wb") as f:
-                    f.write(await audio_file.read())  # Save the file
+                audio_bytes = await audio_file.read()
+                await run_in_threadpool(audio_path_resolved.write_bytes, audio_bytes)
             if not audio_path_resolved.exists():
                 raise FileNotFoundError(f"Audio file not found: {audio_path_resolved}")
             query = self.audio_to_text(str(audio_path_resolved))
@@ -179,32 +189,28 @@ class AudioProcessor:
         if len(room_numbers) == 0:
             return {"error": "Use at least 1 room number."}
         elif len(room_numbers) == 1:
-            start = self.get_teacher_details_with_preprocessing(query, db_path)
-            print("start: ", start)
-            if "error" in start:
-                return start
-            start = start["Room_No"]
+            teacher = self.get_teacher_details_with_preprocessing(
+                query, resolved_db_path
+            )
+            print("start: ", teacher)
+            if "error" in teacher:
+                return teacher
+            if not teacher["Room_No"]:
+                return {"error": "No room number recorded for the matched teacher."}
+            start = teacher["Room_No"]
             end = str(room_numbers[0])
         else:
             start, end = map(str, room_numbers[:2])
 
         try:
-            result, status = await process_data(
-                {"start": start, "end": end, "building": building}
+            return await process_data(
+                {"start": start, "end": end, "preference": None, "building": building}
             )
-            if status != 200:
-                return result, status
-            if isinstance(result, dict) and "headers" in result:
-                result.headers["status"] = "SVG created successfully."
-            return result, status
-        except Exception as e:
-            error_message = f"An unexpected error occurred: {e}"
-            return {"error": error_message}, 500
+        except HTTPException as e:
+            error: ErrorBody = {"error": f"An unexpected error occurred: {e.detail}"}
+            return error, e.status_code
 
 
 if __name__ == "__main__":
     processor = AudioProcessor()
-    file = processor.open_audio_as_filestorage(
-        "../Chatbot/temp_audio/example_audio.wav"
-    )
-    print(processor.process(text="Path from 301 to 303"))
+    print(asyncio.run(processor.process(text="Path from 301 to 303")))

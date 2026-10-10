@@ -1,13 +1,13 @@
+import sqlite3
+
 import networkx as nx
-from typing import List, Tuple
 
 from .building_handling import get_building_paths
-import sqlite3
 
 
 def create_graph_from_svg_data(
-    anchor_points: List[Tuple[float, float]],
-    connections: List[Tuple[Tuple[Tuple[float, float], Tuple[float, float]], float]],
+    anchor_points: list[tuple[float, float]],
+    connections: list[tuple[tuple[tuple[float, float], tuple[float, float]], float]],
 ) -> nx.Graph:
 
     G = nx.Graph()
@@ -16,7 +16,6 @@ def create_graph_from_svg_data(
         G.add_node(point)
 
     for connection in connections:
-
         (point1, point2), weight = connection
         G.add_edge(point1, point2, weight=weight)
 
@@ -47,7 +46,6 @@ def create_graph_from_db(db_path, floor):
     cursor = conn.cursor()
 
     try:
-
         cursor.execute(
             """
             SELECT id, x_coordinate, y_coordinate, floor 
@@ -81,18 +79,16 @@ def create_graph_from_db(db_path, floor):
 
         return G
     except sqlite3.Error as e:
-        raise RuntimeError(f"Database error: {e }")
+        raise RuntimeError(f"Database error: {e}")
     finally:
-
         conn.close()
 
 
 def find_shortest_path(
-    graph: nx.Graph, start: Tuple[float, float], end: Tuple[float, float]
-) -> Tuple[List[Tuple[float, float]], float]:
+    graph: nx.Graph, start: tuple[float, float], end: tuple[float, float]
+) -> tuple[list[tuple[float, float]], float]:
 
     try:
-
         path = nx.dijkstra_path(graph, source=start, target=end, weight="weight")
 
         total_weight = nx.dijkstra_path_length(
@@ -100,7 +96,7 @@ def find_shortest_path(
         )
         return path, total_weight
     except nx.NetworkXNoPath:
-        print(f"No path found between {start } and {end }.")
+        print(f"No path found between {start} and {end}.")
 
         return [], float("inf")
 
@@ -117,7 +113,7 @@ def example():
         print("The graph is not connected.")
         print("Disconnected components:")
         for i, component in enumerate(disconnected_components, start=1):
-            print(f"Component {i }: {component }")
+            print(f"Component {i}: {component}")
 
 
 if __name__ == "__main__":

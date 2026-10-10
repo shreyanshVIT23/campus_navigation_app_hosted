@@ -1,10 +1,8 @@
-import pytest
 import os
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from datetime import datetime, timedelta
-from server.Events_Management.user_auth_jwt import verify_token, create_access_token
 
-
+from Events_Management.user_auth_jwt import create_access_token, verify_token
 
 
 def test_jwt_verify_token():
@@ -150,9 +148,27 @@ def test_event_management_and_view_complete_routes(client):
     bad_event = {"title": "No Date"}
     assert client.post("/user/events/", json=bad_event, headers=h1).status_code == 400
 
+    bad_capacity = {
+        "title": "Bad Capacity",
+        "date": (datetime.now(timezone.utc) + timedelta(days=5)).strftime("%Y-%m-%d"),
+        "time": "14:00",
+        "location": "Main Hall",
+        "capacity": "fifty",
+    }
+    assert (
+        client.post("/user/events/", json=bad_capacity, headers=h1).status_code == 400
+    )
+
+    # Numeric strings (HTML number inputs) are accepted and stored as integers
+    string_capacity = {**bad_capacity, "title": "String Capacity", "capacity": "25"}
+    res_string_capacity = client.post("/user/events/", json=string_capacity, headers=h1)
+    assert res_string_capacity.status_code == 201
+    assert res_string_capacity.json()["capacity"] == 25
+    client.delete(f"/user/events/{res_string_capacity.json()['id']}", headers=h1)
+
     event_payload = {
         "title": "Full Coverage Event",
-        "date": (datetime.now() + timedelta(days=5)).strftime("%Y-%m-%d"),
+        "date": (datetime.now(timezone.utc) + timedelta(days=5)).strftime("%Y-%m-%d"),
         "time": "14:00",
         "location": "Main Hall",
         "capacity": 2,
@@ -165,28 +181,39 @@ def test_event_management_and_view_complete_routes(client):
 
     # 4. Get Event details
     assert client.get(f"/events/{event_id}").status_code == 200
-    assert client.get(f"/events/invalid-uuid").status_code == 404
+    assert client.get("/events/invalid-uuid").status_code == 404
     assert client.get(f"/user/events/{event_id}", headers=h1).status_code == 200
 
-    # Permission denied for non-owner
-    assert client.get(f"/user/events/{event_id}", headers=h2).status_code == 403
+    # Events are shared across all admins in the cpanel (any logged-in user)
+    assert client.get(f"/user/events/{event_id}", headers=h2).status_code == 200
+    shared_ids = [e["id"] for e in client.get("/user/events", headers=h2).json()]
+    assert event_id in shared_ids
 
-    # 5. Update Event
+    # Unauthenticated access is still rejected
+    assert client.get(f"/user/events/{event_id}").status_code == 401
+
+    # 5. Update Event (response body is the updated event)
+    res_update = client.put(
+        f"/user/events/{event_id}", json={"title": "Updated Title"}, headers=h1
+    )
+    assert res_update.status_code == 200
+    updated_event = res_update.json()
+    assert updated_event["id"] == event_id
+    assert updated_event["title"] == "Updated Title"
+    assert updated_event["registered"] == 0
     assert (
         client.put(
-            f"/user/events/{event_id}",
-            json={"title": "Updated Title"},
-            headers=h1,
+            f"/user/events/{event_id}", json={"date": "not-a-date"}, headers=h1
         ).status_code
-        == 200
+        == 400
     )
     assert (
         client.put(
             f"/user/events/{event_id}",
-            json={"title": "Updated Title"},
+            json={"title": "Updated By Other Admin"},
             headers=h2,
         ).status_code
-        == 403
+        == 200
     )
     assert (
         client.put(
@@ -202,8 +229,21 @@ def test_event_management_and_view_complete_routes(client):
         "attendee_name": "Alice Smith",
         "attendee_email": f"alice_{s1}@example.com",
     }
+    res_register = client.post(f"/events/{event_id}/register", json=reg_payload)
+    assert res_register.status_code == 201
+    register_body = res_register.json()
+    assert register_body["message"] == "Registration successful"
+    assert register_body["event"]["id"] == event_id
+    assert register_body["event"]["registered"] == 1
+
+    # Malformed JSON body is treated as empty -> validation error
     assert (
-        client.post(f"/events/{event_id}/register", json=reg_payload).status_code == 201
+        client.post(
+            f"/events/{event_id}/register",
+            content=b"{not json",
+            headers={"Content-Type": "application/json"},
+        ).status_code
+        == 400
     )
 
     # Duplicate registration
@@ -226,10 +266,10 @@ def test_event_management_and_view_complete_routes(client):
     assert res_att.status_code == 200
     attendees = res_att.json()
     assert len(attendees) >= 1
-    attendee_id = attendees[0]["id"]
+    assert attendees[0]["attendee_email"] == f"alice_{s1}@example.com"
 
     assert (
-        client.get(f"/user/events/{event_id}/attendees", headers=h2).status_code == 403
+        client.get(f"/user/events/{event_id}/attendees", headers=h2).status_code == 200
     )
 
     # 8. Cancel registration (Public)
@@ -250,7 +290,7 @@ def test_event_management_and_view_complete_routes(client):
     res_att_new = client.get(f"/user/events/{event_id}/attendees", headers=h1).json()
     att_id_new = res_att_new[0]["id"]
 
-    # 9. Delete attendee (Owner)
+    # 9. Delete attendee (still owner-only)
     assert (
         client.delete(
             f"/user/events/{event_id}/attendees/{att_id_new}", headers=h2
@@ -264,12 +304,13 @@ def test_event_management_and_view_complete_routes(client):
         == 200
     )
 
-    # 10. Delete Event
-    assert client.delete(f"/user/events/{event_id}", headers=h2).status_code == 403
-    assert client.delete(f"/user/events/{event_id}", headers=h1).status_code in (
+    # 10. Delete Event (any admin can delete a shared event)
+    assert client.delete(f"/user/events/{event_id}", headers=h2).status_code in (
         200,
         204,
     )
+    assert client.get(f"/events/{event_id}").status_code == 404
+    assert client.delete(f"/user/events/{event_id}", headers=h1).status_code == 404
     assert (
         client.delete(
             "/user/events/00000000-0000-0000-0000-000000000000", headers=h1
@@ -291,6 +332,15 @@ def test_app_core_routes(client):
     # Test teachers routes
     res_teachers = client.get("/teachers")
     assert res_teachers.status_code == 200
+
+    res_no_teacher = client.get("/teachers", params={"name": "zz_no_such_teacher_zz"})
+    assert res_no_teacher.status_code == 404
+    assert res_no_teacher.json() == {"detail": "No teacher found"}
+
+    res_bad_type = client.post(
+        "/custom_process", json={"type": "lab", "start": "101", "end": "202"}
+    )
+    assert res_bad_type.status_code == 400
 
     teacher_data = {
         "name": "Dr. Test Teacher",
@@ -350,7 +400,6 @@ def test_app_core_routes(client):
     res_reload = client.post("/reload_knowledge")
     assert res_reload.status_code in (200, 500)
 
-
     res_upload = client.post(
         "/upload", data={"text": "How do I get to room 301 from room 201?"}
     )
@@ -366,4 +415,3 @@ def test_app_core_routes(client):
 
     res_upload_empty = client.post("/upload")
     assert res_upload_empty.status_code in (400, 500)
-

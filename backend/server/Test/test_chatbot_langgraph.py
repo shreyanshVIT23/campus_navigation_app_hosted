@@ -33,7 +33,11 @@ SIMPLE_ROUTE: SimpleRoute = {
     "complexity": "simple",
     "error": None,
 }
-ROUTE_FILES = {"start_floor": "/load_shortest_path_svg?floor=3&building=AB-01"}
+ROUTE_URL = "/load_shortest_path_svg?floor=3&building=AB-01"
+ROUTE_FILES = {
+    "start_floor": ROUTE_URL,
+    "legs": [{"building": "AB-01", "floor": 3, "url": ROUTE_URL}],
+}
 
 
 @pytest.fixture

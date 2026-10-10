@@ -27,9 +27,9 @@ const Chatbot = () => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const inputRef = useRef(null);
-  const [startFloorMap, setStartFloorMap] = useState("");
-  const [endFloorMap, setEndFloorMap] = useState("");
-  const [showStartMap, setShowStartMap] = useState(true);
+  // Every floor map of the route, in walking order: [{ building, floor, url }]
+  const [mapLegs, setMapLegs] = useState([]);
+  const [legIndex, setLegIndex] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const mapRef = useRef(null);
@@ -53,24 +53,27 @@ const Chatbot = () => {
     setMessages((prevMessages) => [...prevMessages, { text, sender }]);
   };
 
-  const toggleMap = () => {
-    setShowStartMap((prev) => !prev);
-  };
-
   const handleMapClose = () => {
     if (mapRef.current) {
       mapRef.current.style.display = "none";
     }
-    setEndFloorMap("");
-    setStartFloorMap("");
+    setMapLegs([]);
+    setLegIndex(0);
   };
 
   // The assistant returns map links when the answer is a route
   const showRoute = (files) => {
-    if (!files || !files.start_floor) return;
-    setStartFloorMap(files.start_floor);
-    setEndFloorMap(files.end_floor || "");
-    setShowStartMap(true);
+    if (!files) return;
+    // Older responses only have the start and end maps
+    const legs =
+      files.legs && files.legs.length > 0
+        ? files.legs
+        : [files.start_floor, files.end_floor]
+            .filter(Boolean)
+            .map((url) => ({ building: null, floor: null, url }));
+    if (legs.length === 0) return;
+    setMapLegs(legs);
+    setLegIndex(0);
     if (mapRef.current) {
       mapRef.current.style.display = "block";
     }
@@ -167,7 +170,14 @@ const Chatbot = () => {
     router.push("/student"); // Redirect to "/student"
   };
 
-  const currentMap = showStartMap || !endFloorMap ? startFloorMap : endFloorMap;
+  const currentLeg = mapLegs[legIndex];
+  const legTitle = !currentLeg
+    ? ""
+    : currentLeg.building
+      ? `${currentLeg.building} · floor ${currentLeg.floor}`
+      : legIndex === 0
+        ? "Start Floor Map"
+        : "End Floor Map";
 
   return (
     <div className="flex flex-col h-screen w-full mx-auto bg-white shadow-lg rounded-lg border">
@@ -250,18 +260,30 @@ const Chatbot = () => {
       <div className="flex gap-6 mt-6 absolute top-5 left-150 z-50 text-black">
         {/* Map Container */}
         <div ref={mapRef} className="relative hidden bg-white p-4 shadow-md rounded-lg">
-          <h2 className="font-bold mb-2">
-            {showStartMap || !endFloorMap ? "Start Floor Map" : "End Floor Map"}
+          {/* Right padding keeps the title clear of the buttons */}
+          <h2 className="font-bold mb-2 pr-72">
+            {legTitle}
+            {mapLegs.length > 1 && ` (${legIndex + 1} of ${mapLegs.length})`}
           </h2>
 
-          {/* Swap only when the route spans two floors */}
-          {endFloorMap && (
-            <button
-              onClick={toggleMap}
-              className="absolute top-2 right-16 bg-gray-300 p-2 rounded-md shadow-md z-10 cursor-pointer"
-            >
-              🔄 Swap Map
-            </button>
+          {/* Step through the floors only when the route spans more than one */}
+          {mapLegs.length > 1 && (
+            <div className="absolute top-2 right-16 flex gap-2 z-10">
+              <button
+                onClick={() => setLegIndex((i) => i - 1)}
+                disabled={legIndex === 0}
+                className="bg-gray-300 p-2 rounded-md shadow-md cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                ◀ Previous
+              </button>
+              <button
+                onClick={() => setLegIndex((i) => i + 1)}
+                disabled={legIndex === mapLegs.length - 1}
+                className="bg-gray-300 p-2 rounded-md shadow-md cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Next ▶
+              </button>
+            </div>
           )}
           <button
             onClick={handleMapClose}
@@ -270,9 +292,9 @@ const Chatbot = () => {
             <Image src="/Close.png" width={30} height={30} alt="close" />
           </button>
 
-          {currentMap && (
+          {currentLeg && (
             <iframe
-              src={getApiUrl(currentMap)}
+              src={getApiUrl(currentLeg.url)}
               title="Route map"
               className="w-[500px] h-[500px] border rounded-lg"
             />

@@ -1,7 +1,7 @@
 === TEST SUITE LOG: test_comprehensive_routes_log.txt ===
 
 ============================================================
-TIMESTAMP   : 2026-10-10T12:19:28.514901+05:30
+TIMESTAMP   : 2026-10-10T18:54:11.925627+05:30
 TESTED ROUTE: GET /load_svg
 REQUEST DATA:
 {
@@ -14,7 +14,7 @@ RESPONSE:
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-10-10T12:19:28.514901+05:30
+TIMESTAMP   : 2026-10-10T18:54:11.934269+05:30
 TESTED ROUTE: GET /load_shortest_path_svg
 REQUEST DATA:
 {
@@ -29,7 +29,7 @@ RESPONSE:
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-10-10T12:19:28.514901+05:30
+TIMESTAMP   : 2026-10-10T18:54:11.954997+05:30
 TESTED ROUTE: GET /teachers
 REQUEST DATA: None
 STATUS CODE : 200
@@ -1407,7 +1407,7 @@ RESPONSE:
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-10-10T12:19:28.527800+05:30
+TIMESTAMP   : 2026-10-10T18:54:11.967372+05:30
 TESTED ROUTE: GET /teachers
 REQUEST DATA:
 {
@@ -1421,7 +1421,7 @@ RESPONSE:
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-10-10T12:19:28.527800+05:30
+TIMESTAMP   : 2026-10-10T18:54:11.975458+05:30
 TESTED ROUTE: POST /custom_process
 REQUEST DATA:
 {
@@ -1437,7 +1437,7 @@ RESPONSE:
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-10-10T12:19:28.535802+05:30
+TIMESTAMP   : 2026-10-10T18:54:11.995492+05:30
 TESTED ROUTE: POST /teachers
 REQUEST DATA:
 {
@@ -1454,7 +1454,7 @@ RESPONSE:
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-10-10T12:19:28.568786+05:30
+TIMESTAMP   : 2026-10-10T18:54:12.121295+05:30
 TESTED ROUTE: POST /process_path
 REQUEST DATA:
 {
@@ -1467,14 +1467,14 @@ STATUS CODE : 200
 RESPONSE:
 {
   "files": {
-    "start_floor": "/load_shortest_path_svg?floor=4&building=AB-01&route=2ffef3f8744c9eea8e3d617707e479db",
-    "end_floor": "/load_shortest_path_svg?floor=5&building=AB-01&route=2ffef3f8744c9eea8e3d617707e479db"
+    "start_floor": "/load_shortest_path_svg?floor=4&building=AB-01&route=c0243600736f3a6d6c881fb99ea24a2e",
+    "end_floor": "/load_shortest_path_svg?floor=5&building=AB-01&route=c0243600736f3a6d6c881fb99ea24a2e"
   }
 }
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-10-10T12:19:28.594451+05:30
+TIMESTAMP   : 2026-10-10T18:54:12.271445+05:30
 TESTED ROUTE: POST /multi_building_process_path
 REQUEST DATA:
 {
@@ -1488,19 +1488,19 @@ RESPONSE:
 {
   "files": {
     "AB-01": {
-      "start_floor": "/load_shortest_path_svg?floor=1&building=AB-01&route=8fb2b38db5ee3e5d50e4ab3fd7564ca5",
-      "end_floor": "/load_shortest_path_svg?floor=0&building=AB-01&route=8fb2b38db5ee3e5d50e4ab3fd7564ca5"
+      "start_floor": "/load_shortest_path_svg?floor=1&building=AB-01&route=37955c2ea51286ceee9d1a35789443fa",
+      "end_floor": "/load_shortest_path_svg?floor=0&building=AB-01&route=37955c2ea51286ceee9d1a35789443fa"
     },
     "Lab-Complex": {
-      "start_floor": "/load_shortest_path_svg?floor=0&building=Lab-Complex&route=8fb2b38db5ee3e5d50e4ab3fd7564ca5",
-      "end_floor": "/load_shortest_path_svg?floor=2&building=Lab-Complex&route=8fb2b38db5ee3e5d50e4ab3fd7564ca5"
+      "start_floor": "/load_shortest_path_svg?floor=0&building=Lab-Complex&route=37955c2ea51286ceee9d1a35789443fa",
+      "end_floor": "/load_shortest_path_svg?floor=2&building=Lab-Complex&route=37955c2ea51286ceee9d1a35789443fa"
     }
   }
 }
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-10-10T12:19:28.607752+05:30
+TIMESTAMP   : 2026-10-10T18:54:12.306227+05:30
 TESTED ROUTE: POST /custom_process
 REQUEST DATA:
 {
@@ -1516,7 +1516,7 @@ RESPONSE:
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-10-10T12:19:29.023411+05:30
+TIMESTAMP   : 2026-10-10T18:54:14.190241+05:30
 TESTED ROUTE: GET /search_teacher
 REQUEST DATA:
 {
@@ -1533,7 +1533,7 @@ RESPONSE:
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-10-10T12:19:31.584702+05:30
+TIMESTAMP   : 2026-10-10T18:54:18.324529+05:30
 TESTED ROUTE: POST /chat
 REQUEST DATA:
 {
@@ -1542,13 +1542,13 @@ REQUEST DATA:
 STATUS CODE : 200
 RESPONSE:
 {
-  "response": "Dr. Debashis Adhikari is a Professor at VIT Bhopal with 31 years of experience, including 23 years serving in the Indian Air Force as a Wing Commander. His research interests and expertise focus on MIMO wireless systems.",
+  "response": "Dr. Debashis Adhikari is a Professor at VIT Bhopal with 31 years of experience, including 23 years serving in the Indian Air Force as a Wing Commander. His research interests include MIMO Wireless systems, and he holds a PhD in Wireless Communication from the Defense Institute of Advanced Technology (DRDO), Pune.",
   "status": "success"
 }
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-10-10T12:19:33.454189+05:30
+TIMESTAMP   : 2026-10-10T18:54:20.162716+05:30
 TESTED ROUTE: POST /chat
 REQUEST DATA:
 {
@@ -1563,7 +1563,7 @@ RESPONSE:
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-10-10T12:19:35.433369+05:30
+TIMESTAMP   : 2026-10-10T18:54:22.320041+05:30
 TESTED ROUTE: POST /chat
 REQUEST DATA:
 {
@@ -1572,13 +1572,13 @@ REQUEST DATA:
 STATUS CODE : 200
 RESPONSE:
 {
-  "response": "Dr. R. Shriram serves as a Professor and is the Programme Chair of Gaming Technology in the School of Computing Science & Engineering at VIT Bhopal University.",
+  "response": "Dr. R. Shriram serves as a Professor and is also the Programme Chair of Gaming Technology in the School of Computing Science & Engineering at VIT Bhopal University.",
   "status": "success"
 }
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-10-10T12:19:37.406646+05:30
+TIMESTAMP   : 2026-10-10T18:54:24.424579+05:30
 TESTED ROUTE: POST /chat
 REQUEST DATA:
 {
@@ -1587,13 +1587,13 @@ REQUEST DATA:
 STATUS CODE : 200
 RESPONSE:
 {
-  "response": "Dr Hemant Kumar Nashine is a Professor and Dean of SASL at VIT Bhopal with 20 years of academic experience and postdoctoral research from Texas A&M University Kingsville as a Fulbright-Nehru Post Doctorate Fellow. He has an extensive research background with 170 Scopus publications and has completed multiple international and national projects.",
+  "response": "Dr. Hemant Kumar Nashine is a Professor and Dean of SASL at VIT Bhopal with 20 years of academic experience. He is a Fulbright-Nehru Post Doctorate Fellow with over 170 Scopus publications and extensive international research experience.",
   "status": "success"
 }
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-10-10T12:19:39.286144+05:30
+TIMESTAMP   : 2026-10-10T18:54:26.747716+05:30
 TESTED ROUTE: POST /chat
 REQUEST DATA:
 {
@@ -1602,13 +1602,13 @@ REQUEST DATA:
 STATUS CODE : 200
 RESPONSE:
 {
-  "response": "Dr. M. K. Jayanthi is a Professor in the School of Computer Science and Engineering (SCSE) at VIT Bhopal University. She has over 26 years of teaching experience and extensive academic background in Computer Science and Engineering.",
+  "response": "Dr. M. K. Jayanthi is a Professor in the School of Computer Science and Engineering (SCSE) at VIT Bhopal University. She has over 26 years of teaching experience and holds multiple degrees, including a Ph.D. in Computer Science and Engineering.",
   "status": "success"
 }
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-10-10T12:19:41.304600+05:30
+TIMESTAMP   : 2026-10-10T18:54:29.113550+05:30
 TESTED ROUTE: POST /chat
 REQUEST DATA:
 {
@@ -1617,13 +1617,13 @@ REQUEST DATA:
 STATUS CODE : 200
 RESPONSE:
 {
-  "response": "Dr. Zaheer Kareem Ansari is a Professor in Mathematics at VIT Bhopal with over 30 years of academic and administrative experience. His research focuses on Fixed Point Theory, and he has authored multiple books and over 45 publications in peer-reviewed journals and conferences.",
+  "response": "Dr. Zaheer Kareem Ansari is a Professor of Mathematics at VIT Bhopal with over 30 years of academic and administrative experience. His research focuses on Fixed Point Theory, and he has authored multiple publications and books in engineering mathematics.",
   "status": "success"
 }
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-10-10T12:19:41.403635+05:30
+TIMESTAMP   : 2026-10-10T18:54:29.304694+05:30
 TESTED ROUTE: POST /reload_knowledge
 REQUEST DATA: None
 STATUS CODE : 200
@@ -1635,7 +1635,7 @@ RESPONSE:
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-10-10T12:19:41.948238+05:30
+TIMESTAMP   : 2026-10-10T18:54:30.527528+05:30
 TESTED ROUTE: POST /upload
 REQUEST DATA:
 {
@@ -1645,14 +1645,14 @@ STATUS CODE : 200
 RESPONSE:
 {
   "files": {
-    "start_floor": "/load_shortest_path_svg?floor=3&building=AB-01&route=ba719a99b4272267ba8a5aef593dc9ca",
-    "end_floor": "/load_shortest_path_svg?floor=2&building=AB-01&route=ba719a99b4272267ba8a5aef593dc9ca"
+    "start_floor": "/load_shortest_path_svg?floor=3&building=AB-01&route=ef5047e159c2378a74392033adfa74ef",
+    "end_floor": "/load_shortest_path_svg?floor=2&building=AB-01&route=ef5047e159c2378a74392033adfa74ef"
   }
 }
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-10-10T12:19:42.549472+05:30
+TIMESTAMP   : 2026-10-10T18:54:31.884064+05:30
 TESTED ROUTE: POST /upload
 REQUEST DATA: None
 STATUS CODE : 400

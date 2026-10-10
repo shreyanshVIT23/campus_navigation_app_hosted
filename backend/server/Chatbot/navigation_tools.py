@@ -5,7 +5,7 @@ from langchain_core.tools import BaseTool, tool
 from typing_extensions import TypedDict
 
 from Utils.route_types import BuildingFloorFiles
-from Utils.route_utilary import building_floor_files
+from Utils.route_utilary import building_floor_files, map_legs
 from Utils.svg_manipulator import main as render_route
 from Utils.svg_manipulator import multi_building_nav as render_multi_building_route
 
@@ -46,6 +46,7 @@ def route_within_building(
         )
 
     files = building_floor_files(building, route)
+    files["legs"] = map_legs(building, route)
     floors = (
         f"floor {route['path'][0]}"
         if route["complexity"] == "simple"
@@ -76,6 +77,11 @@ def route_between_buildings(
     arrival = end_files.get("end_floor") or end_files.get("start_floor")
     if arrival:
         files["end_floor"] = arrival
+    # Every map in walking order, including the exit and entrance floors
+    files["legs"] = [
+        *map_legs(start_building, route["path"][start_building]),
+        *map_legs(end_building, route["path"][end_building]),
+    ]
 
     summary = (
         f"Route found from {start} ({start_building}) to {end} ({end_building}). "

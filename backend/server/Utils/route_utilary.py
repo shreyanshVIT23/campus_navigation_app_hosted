@@ -16,6 +16,7 @@ from .route_types import (
     BuildingFloorFiles,
     BuildingRoute,
     FailedRoute,
+    MapLeg,
     MultiBuildingFilesResponse,
     MultiBuildingRequest,
     PathFilesResponse,
@@ -29,6 +30,9 @@ from .svg_manipulator import (
 )
 from .svg_manipulator import (
     multi_building_nav as make_svg_multi,
+)
+from .svg_manipulator import (
+    route_legs,
 )
 
 logger = logging.getLogger(__name__)
@@ -127,6 +131,21 @@ def building_floor_files(
         }
 
     return {}
+
+
+def map_legs(building_name: str, building_route: BuildingRoute) -> list[MapLeg]:
+    """One map link per floor of the route, in walking order ([] for a failed route)."""
+    if building_route["complexity"] == "failed":
+        return []
+    route_id = building_route.get("map_id")
+    return [
+        {
+            "building": building_name,
+            "floor": floor,
+            "url": shortest_path_svg_url(floor, building_name, route_id),
+        }
+        for floor, _ in route_legs(building_route)
+    ]
 
 
 async def process_multi_building(

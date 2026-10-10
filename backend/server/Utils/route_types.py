@@ -89,9 +89,18 @@ class PathFilesResponse(TypedDict):
     note: NotRequired[str]
 
 
+class MapLeg(TypedDict):
+    building: str
+    floor: int
+    url: str
+
+
 class BuildingFloorFiles(TypedDict, total=False):
     start_floor: str
     end_floor: str
+    # Every floor map of the route in walking order (chat only); a route between
+    # buildings also has the exit and entrance floors, which the two fields above skip
+    legs: list[MapLeg]
 
 
 class MultiBuildingFilesResponse(TypedDict):

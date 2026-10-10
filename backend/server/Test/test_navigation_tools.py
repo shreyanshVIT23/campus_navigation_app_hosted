@@ -47,10 +47,22 @@ def engine_calls(monkeypatch):
     return calls
 
 
+def leg(building: str, floor: int, route_id: str = "") -> dict:
+    url = f"/load_shortest_path_svg?floor={floor}&building={building}"
+    return {
+        "building": building,
+        "floor": floor,
+        "url": url + (f"&route={route_id}" if route_id else ""),
+    }
+
+
 def test_simple_route_has_start_floor_only(engine_calls):
     summary, artifact = route_within_building("301", "305", "AB-01")
     assert artifact == {
-        "files": {"start_floor": "/load_shortest_path_svg?floor=3&building=AB-01"}
+        "files": {
+            "start_floor": "/load_shortest_path_svg?floor=3&building=AB-01",
+            "legs": [leg("AB-01", 3)],
+        }
     }
     assert "301" in summary and "305" in summary
     assert engine_calls == [("301", "305", "AB-01", None)]
@@ -62,6 +74,7 @@ def test_complex_route_has_both_floors(engine_calls):
         "files": {
             "start_floor": "/load_shortest_path_svg?floor=3&building=AB-01",
             "end_floor": "/load_shortest_path_svg?floor=4&building=AB-01",
+            "legs": [leg("AB-01", 3), leg("AB-01", 4)],
         }
     }
     assert engine_calls[-1][3] == "Lift"
@@ -112,8 +125,48 @@ def test_route_between_buildings(monkeypatch):
         "files": {
             "start_floor": "/load_shortest_path_svg?floor=3&building=AB-01",
             "end_floor": "/load_shortest_path_svg?floor=4&building=Lab-Complex",
+            "legs": [leg("AB-01", 3), leg("Lab-Complex", 3), leg("Lab-Complex", 4)],
         }
     }
+
+
+def test_route_between_buildings_shows_the_exit_and_entrance_floors(monkeypatch):
+    # AB-01 202 (floor 2) down to the exit on floor 0, then the Lab Complex
+    # entrance on floor 0 up to 202 on floor 2: four maps, in walking order
+    leaving: ComplexRoute = {
+        "path": [(2, [(0.0, 0.0)]), (0, [(1.0, 1.0)])],
+        "total_weight": 5.0,
+        "complexity": "complex",
+        "error": None,
+        "map_id": "a" * 32,
+    }
+    arriving: ComplexRoute = {
+        "path": [(0, [(2.0, 2.0)]), (2, [(3.0, 3.0)])],
+        "total_weight": 6.0,
+        "complexity": "complex",
+        "error": None,
+        "map_id": "a" * 32,
+    }
+    route: MultiBuildingRoute = {
+        "path": {"AB-01": leaving, "Lab-Complex": arriving},
+        "total_weight": 11.0,
+        "complexity": "multi-building",
+        "error": None,
+    }
+    monkeypatch.setattr(
+        navigation_tools, "render_multi_building_route", lambda *args: route
+    )
+    _, artifact = route_between_buildings("202", "AB-01", "202", "Lab-Complex")
+    assert artifact is not None
+    assert artifact["files"].get("legs") == [
+        leg("AB-01", 2, "a" * 32),
+        leg("AB-01", 0, "a" * 32),
+        leg("Lab-Complex", 0, "a" * 32),
+        leg("Lab-Complex", 2, "a" * 32),
+    ]
+    # The two-map fields stay for older pages: where you start, where you arrive
+    assert artifact["files"].get("start_floor") == leg("AB-01", 2, "a" * 32)["url"]
+    assert artifact["files"].get("end_floor") == leg("Lab-Complex", 2, "a" * 32)["url"]
 
 
 def test_find_route_tool_returns_content_and_artifact(engine_calls):
@@ -128,7 +181,10 @@ def test_find_route_tool_returns_content_and_artifact(engine_calls):
         }
     )
     assert message.artifact == {
-        "files": {"start_floor": "/load_shortest_path_svg?floor=3&building=AB-01"}
+        "files": {
+            "start_floor": "/load_shortest_path_svg?floor=3&building=AB-01",
+            "legs": [leg("AB-01", 3)],
+        }
     }
     assert "301" in message.content
 

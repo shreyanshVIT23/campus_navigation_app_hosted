@@ -1,8 +1,13 @@
+import itertools
+
+import pytest
 from lxml import etree as ET
 
 from Utils import db_shortest_path_maker
+from Utils import svg_manipulator as svg
+from Utils.building_handling import get_building_paths
 from Utils.route_types import ComplexRoute, SimpleRoute
-from Utils.svg_manipulator import modify_svg
+from Utils.svg_manipulator import render_floor
 
 SVG_NS = {"svg": "http://www.w3.org/2000/svg"}
 
@@ -33,10 +38,10 @@ ROUTE_POINTS = [(0.0, 0.0), (10.0, 0.0), (20.0, 0.0), (20.0, 10.0), (30.0, 10.0)
 
 def render(tmp_path, points=ROUTE_POINTS):
     floor = tmp_path / "floor 1 copy path.svg"
-    floor.write_text(FLOOR_SVG, encoding="utf-8")
-    output = tmp_path / "floor 1 shortest path.svg"
-    modify_svg(str(floor), str(output), points)
-    return ET.parse(str(output)).getroot()
+    if not floor.exists():
+        floor.write_text(FLOOR_SVG, encoding="utf-8")
+    # Drawn in memory: no output SVG file
+    return ET.fromstring(render_floor(str(floor), points))
 
 
 def path_lines(root):
@@ -158,3 +163,99 @@ def test_destination_building_leg_runs_from_entrance_to_room(monkeypatch):
         (0, [(6.0, 6.0), (7.0, 7.0)]),
         (2, [(8.0, 8.0), (9.0, 9.0)]),
     ]
+
+
+# ============================================================
+# SAME MAPS AS THE ORIGINAL PER-LINE DRAWING
+# ============================================================
+
+
+def reference_drawing(svg_file, points) -> bytes:
+    """The original algorithm: style every walkway line on every request."""
+    root = ET.parse(svg_file, ET.XMLParser(remove_blank_text=True)).getroot()
+    svg.split_polylines(root)
+    svg.create_arrow_with_image(
+        root, points[-2], points[-1], image_href=svg.pin_image_data_uri()
+    )
+    group = root.find(".//svg:g[@id='Path']", namespaces=SVG_NS)
+    if group is not None:
+        segments = svg.route_segments(points)
+        for element in group.iter():
+            if isinstance(element.tag, str) and "class" in element.attrib:
+                del element.attrib["class"]
+        for line in group.xpath(".//svg:line", namespaces=SVG_NS):
+            start = svg.point_key(line.get("x1"), line.get("y1"))
+            end = svg.point_key(line.get("x2"), line.get("y2"))
+            if (start, end) in segments:
+                line.set("visibility", "visible")
+                line.set("stroke", "red")
+            else:
+                line.set("visibility", "hidden")
+        for shape in group.xpath(".//svg:path", namespaces=SVG_NS):
+            shape.set("visibility", "hidden")
+    # Serialised exactly as render_floor does, so only the drawing is compared
+    return ET.tostring(
+        root.getroottree(), pretty_print=True, xml_declaration=True, encoding="utf-8"
+    )
+
+
+def canonical(svg: bytes) -> bytes:
+    root = ET.fromstring(svg, ET.XMLParser(remove_blank_text=True))
+    return ET.tostring(root, method="c14n")
+
+
+def first_difference(drawn: bytes, expected: bytes) -> str | None:
+    """Where two SVGs first differ, or None. Cheap: comparing the raw bytes would
+    make pytest diff two ~200 KB lines, which can run for a very long time."""
+    if drawn == expected:
+        return None
+    a, b = ET.fromstring(drawn), ET.fromstring(expected)
+    tree = a.getroottree()
+    for left, right in itertools.zip_longest(a.iter(), b.iter()):
+        if left is None or right is None:
+            return f"one SVG has extra elements (drawn ended: {left is None})"
+        where = f"at {tree.getpath(left)}"
+        if left.tag != right.tag or dict(left.attrib) != dict(right.attrib):
+            return (
+                f"{where}: drawn {left.tag} {dict(left.attrib)} "
+                f"!= expected {right.tag} {dict(right.attrib)}"
+            )
+        for part in ("text", "tail"):
+            if getattr(left, part) != getattr(right, part):
+                return (
+                    f"{where}: {part} {getattr(left, part)!r} "
+                    f"!= expected {getattr(right, part)!r}"
+                )
+        # Prefix names don't matter: lxml invents one (ns0, ns40, ...) when the
+        # pin's xlink:href is added to a map that doesn't declare xlink
+        if set(left.nsmap.values()) != set(right.nsmap.values()):
+            return f"{where}: namespaces {left.nsmap} != expected {right.nsmap}"
+    # Same elements, attributes (compared by namespace URI), text and namespaces
+    return None
+
+
+@pytest.mark.parametrize(
+    ("building", "start", "end"),
+    [
+        ("AB-01", "101", "105"),
+        ("AB-01", "105", "201"),
+        ("AB-01", "501", "515"),
+        ("AB-01", "301", "female toilet"),
+        ("Lab-Complex", "101", "201"),
+    ],
+)
+def test_drawing_matches_the_original_algorithm(building, start, end):
+    db_path, floor_path = get_building_paths(building)
+    route = db_shortest_path_maker.main(db_path, start, end)
+    assert route["complexity"] != "failed", route
+    for (floor, points), (_, drawn) in zip(
+        svg.route_legs(route),
+        svg.render_route(floor_path, route),
+        strict=True,
+    ):
+        source = svg.floor_svg(floor, floor_path)
+        # Both through the same canonical form: C14N sorts attributes
+        difference = first_difference(
+            canonical(drawn), canonical(reference_drawing(source, points))
+        )
+        assert difference is None, f"floor {floor}: {difference}"

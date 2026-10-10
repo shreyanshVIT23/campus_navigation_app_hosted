@@ -1,5 +1,4 @@
 import json
-import os
 import shutil
 import sys
 import tempfile
@@ -7,7 +6,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
-from dotenv import dotenv_values
 from fastapi.testclient import TestClient
 
 # Ensure server directory is in sys.path
@@ -15,41 +13,15 @@ server_dir = Path(__file__).resolve().parent.parent
 if str(server_dir) not in sys.path:
     sys.path.insert(0, str(server_dir))
 
-# .env settings for data the app writes; tests get temporary copies of these.
-# Read-only inputs (floor maps, assets, the faculty sheet) stay as they are.
-WRITABLE_SETTINGS = (
-    "DB_PATH",
-    "DB_EVENT",
-    "DB_AUTH_PATH",
-    "DB_TEACHER_DATA",
-    "OUTPUT_MAPS_DIR",
-    "AUDIO_DIR",
-)
+from Utils.test_copies import use_copies
+
+# Tests get temporary copies of the data the app writes (Utils.test_copies)
 test_data_dir = Path(tempfile.mkdtemp(prefix="campus-nav-tests-"))
 
 
-def use_test_copy(setting: str) -> None:
-    configured = os.environ.get(setting) or dotenv_values(server_dir / ".env").get(
-        setting
-    )
-    if not configured:
-        return
-    source = (server_dir / configured).resolve()
-    copy = test_data_dir / source.relative_to(server_dir)
-    if source.is_dir():
-        shutil.copytree(source, copy, dirs_exist_ok=True)
-    elif source.is_file():
-        copy.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, copy)
-    os.environ[setting] = str(copy)
-
-
 def pytest_configure():
-    # Runs before any test module (and so the app and Utils.loader) is imported.
-    # Utils.loader reads os.environ, and load_dotenv() never overrides variables
-    # that are already set, so the app only ever sees the copies.
-    for setting in WRITABLE_SETTINGS:
-        use_test_copy(setting)
+    # Runs before any test module (and so the app and Utils.loader) is imported
+    use_copies(test_data_dir)
 
 
 def pytest_unconfigure():

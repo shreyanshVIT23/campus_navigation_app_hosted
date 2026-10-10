@@ -1,9 +1,10 @@
+import logging
 import re
 import sqlite3
 
 import networkx as nx
 
-from . import db_access, graph_converter, place_lookup
+from . import db_access, file_version, graph_converter, place_lookup
 from .building_handling import get_building_paths
 from .loader import env_variables
 from .route_types import (
@@ -15,6 +16,9 @@ from .route_types import (
     MultiBuildingRoute,
     SimpleRoute,
 )
+from .timing import timed
+
+logger = logging.getLogger(__name__)
 
 
 class AmbiguousValueError(ValueError):
@@ -90,10 +94,11 @@ def get_exact_node(graph, coordinates, floor):
             and data["floor"] == floor
         ):
             return node
-    print("Exact node not found for the given coordinates.")
+    logger.debug("No graph node at %s on floor %s", coordinates, floor)
     return None
 
 
+@timed("nodes")
 def nodes_at(graph, spots: list[Coordinates], floor) -> list:
     """Graph nodes for the given anchor coordinates (spots not in the graph are skipped)."""
     nodes = (get_exact_node(graph, spot, floor) for spot in spots)
@@ -104,6 +109,7 @@ def interpret_path(graph, path) -> list[Coordinates]:
     return [(graph.nodes[node]["x"], graph.nodes[node]["y"]) for node in path]
 
 
+@timed("dijkstra")
 def search_from(graph, sources) -> tuple[dict, dict]:
     """Distances and paths from the nearest of `sources` to every reachable node."""
     lengths, paths = nx.multi_source_dijkstra(graph, set(sources), weight="weight")
@@ -128,6 +134,7 @@ def place_key(label: str) -> str:
     return re.sub(r"(\([^)]*\)|-[A-Za-z])$", "", label.strip())
 
 
+@timed("resolve")
 def resolve_candidates(
     db_path, description, floor: int | None, role="Location"
 ) -> tuple[int, list[Coordinates]]:
@@ -164,6 +171,7 @@ def resolve_candidates(
     return places[0][2], spots
 
 
+@timed("lift_stairs")
 def get_lift_stairs(db_path, floor, graph, spots, preference) -> Coordinates:
     """The lift or stairs on `floor` with the shortest walk to any of `spots`."""
     if preference == "Lift":
@@ -223,6 +231,7 @@ def shared_connectors(db_path, floor_a, floor_b, preference=None) -> list[Connec
     return [(name, on_a[name], on_b[name]) for name in sorted(on_a) if name in on_b]
 
 
+@timed("floors")
 def route_across_floors(
     db_path,
     graph_start,
@@ -357,6 +366,7 @@ def map_label(db_path, room: str) -> str:
     return room
 
 
+@timed("translate")
 def translate_place(db_path, text: str, teachers: list[place_lookup.Teacher]) -> str:
     """The map label for what the user typed: the text itself or a teacher's room.
 
@@ -387,6 +397,7 @@ def translate_place(db_path, text: str, teachers: list[place_lookup.Teacher]) ->
     return next(iter(rooms)) if rooms else map_label(db_path, text)
 
 
+@timed("toilet")
 def toilet_route(
     db_path,
     room: str,
@@ -454,6 +465,8 @@ def toilet_route(
     return best
 
 
+@timed("route")
+@file_version.consistent_versions()
 def main(
     db_path,
     start_description,
@@ -608,6 +621,8 @@ def reverse_route(route: SimpleRoute | ComplexRoute) -> SimpleRoute | ComplexRou
     }
 
 
+@timed("multi_route")
+@file_version.consistent_versions()
 def multi_building_nav(
     db_path_1,
     building_name1: str,

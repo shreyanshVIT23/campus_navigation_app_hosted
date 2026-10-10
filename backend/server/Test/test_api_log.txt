@@ -1,7 +1,7 @@
 === TEST SUITE LOG: test_api_log.txt ===
 
 ============================================================
-TIMESTAMP   : 2026-10-10T10:56:59.053152+05:30
+TIMESTAMP   : 2026-10-10T12:19:17.545622+05:30
 TESTED ROUTE: GET /load_svg
 REQUEST DATA:
 {
@@ -14,7 +14,7 @@ RESPONSE:
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-10-10T10:56:59.053152+05:30
+TIMESTAMP   : 2026-10-10T12:19:17.554667+05:30
 TESTED ROUTE: GET /teachers
 REQUEST DATA: None
 STATUS CODE : 200
@@ -1387,168 +1387,6 @@ RESPONSE:
     "cabin_no": null,
     "room_no": "T510",
     "phone_number": "9994115629"
-  },
-  {
-    "name": "Dr. Test Teacher",
-    "cabin_no": "G-999",
-    "room_no": "101",
-    "phone_number": "1234567890"
-  },
-  {
-    "name": "Dr. Test Teacher",
-    "cabin_no": "G-999",
-    "room_no": "101",
-    "phone_number": "1234567890"
-  },
-  {
-    "name": "Dr. Test Teacher",
-    "cabin_no": "G-999",
-    "room_no": "101",
-    "phone_number": "1234567890"
-  },
-  {
-    "name": "Dr. Test Teacher",
-    "cabin_no": "G-999",
-    "room_no": "101",
-    "phone_number": "1234567890"
-  },
-  {
-    "name": "Dr. Test Teacher",
-    "cabin_no": "G-999",
-    "room_no": "101",
-    "phone_number": "1234567890"
-  },
-  {
-    "name": "Dr. Test Teacher",
-    "cabin_no": "G-999",
-    "room_no": "101",
-    "phone_number": "1234567890"
-  },
-  {
-    "name": "Dr. Test Teacher",
-    "cabin_no": "G-999",
-    "room_no": "101",
-    "phone_number": "1234567890"
-  },
-  {
-    "name": "Dr. Test Teacher",
-    "cabin_no": "G-999",
-    "room_no": "101",
-    "phone_number": "1234567890"
-  },
-  {
-    "name": "Dr. Test Teacher",
-    "cabin_no": "G-999",
-    "room_no": "101",
-    "phone_number": "1234567890"
-  },
-  {
-    "name": "Dr. Test Teacher",
-    "cabin_no": "G-999",
-    "room_no": "101",
-    "phone_number": "1234567890"
-  },
-  {
-    "name": "Dr. Test Teacher",
-    "cabin_no": "G-999",
-    "room_no": "101",
-    "phone_number": "1234567890"
-  },
-  {
-    "name": "Dr. Test Teacher",
-    "cabin_no": "G-999",
-    "room_no": "101",
-    "phone_number": "1234567890"
-  },
-  {
-    "name": "Dr. Test Teacher",
-    "cabin_no": "G-999",
-    "room_no": "101",
-    "phone_number": "1234567890"
-  },
-  {
-    "name": "Dr. Test Teacher",
-    "cabin_no": "G-999",
-    "room_no": "101",
-    "phone_number": "1234567890"
-  },
-  {
-    "name": "Dr. Test Teacher",
-    "cabin_no": "G-999",
-    "room_no": "101",
-    "phone_number": "1234567890"
-  },
-  {
-    "name": "Dr. Test Teacher",
-    "cabin_no": "G-999",
-    "room_no": "101",
-    "phone_number": "1234567890"
-  },
-  {
-    "name": "Dr. Test Teacher",
-    "cabin_no": "G-999",
-    "room_no": "101",
-    "phone_number": "1234567890"
-  },
-  {
-    "name": "Dr. Test Teacher",
-    "cabin_no": "G-999",
-    "room_no": "101",
-    "phone_number": "1234567890"
-  },
-  {
-    "name": "Dr. Test Teacher",
-    "cabin_no": "G-999",
-    "room_no": "101",
-    "phone_number": "1234567890"
-  },
-  {
-    "name": "Dr. Test Teacher",
-    "cabin_no": "G-999",
-    "room_no": "101",
-    "phone_number": "1234567890"
-  },
-  {
-    "name": "Dr. Test Teacher",
-    "cabin_no": "G-999",
-    "room_no": "101",
-    "phone_number": "1234567890"
-  },
-  {
-    "name": "Dr. Test Teacher",
-    "cabin_no": "G-999",
-    "room_no": "101",
-    "phone_number": "1234567890"
-  },
-  {
-    "name": "Dr. Test Teacher",
-    "cabin_no": "G-999",
-    "room_no": "101",
-    "phone_number": "1234567890"
-  },
-  {
-    "name": "Dr. Test Teacher",
-    "cabin_no": "G-999",
-    "room_no": "101",
-    "phone_number": "1234567890"
-  },
-  {
-    "name": "Dr. Test Teacher",
-    "cabin_no": "G-999",
-    "room_no": "101",
-    "phone_number": "1234567890"
-  },
-  {
-    "name": "Dr. Test Teacher",
-    "cabin_no": "G-999",
-    "room_no": "101",
-    "phone_number": "1234567890"
-  },
-  {
-    "name": "Dr. Test Teacher",
-    "cabin_no": "G-999",
-    "room_no": "101",
-    "phone_number": "1234567890"
   }
 ]
 ============================================================

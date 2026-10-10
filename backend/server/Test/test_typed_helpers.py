@@ -143,6 +143,24 @@ def test_building_floor_files_complex():
     }
 
 
+def test_building_floor_files_carry_the_route_id():
+    route_id = "0123456789abcdef0123456789abcdef"
+    files = building_floor_files(
+        "AB-01",
+        {
+            "path": [(1, [(0.0, 0.0)]), (2, [(1.0, 1.0)])],
+            "total_weight": 4.0,
+            "complexity": "complex",
+            "error": None,
+            "map_id": route_id,
+        },
+    )
+    assert files == {
+        "start_floor": f"/load_shortest_path_svg?floor=1&building=AB-01&route={route_id}",
+        "end_floor": f"/load_shortest_path_svg?floor=2&building=AB-01&route={route_id}",
+    }
+
+
 def test_building_floor_files_failed_route_is_empty():
     files = building_floor_files(
         "AB-01",

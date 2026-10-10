@@ -1,6 +1,12 @@
+import logging
 import sqlite3
 
 from typing_extensions import TypedDict
+
+from . import file_version
+from .timing import timed
+
+logger = logging.getLogger(__name__)
 
 
 class TeacherRecord(TypedDict):
@@ -17,6 +23,8 @@ class NewTeacher(TypedDict):
     phone_number: str | None
 
 
+@timed("db.get_coordinates")
+@file_version.cached_by_file("db.get_coordinates")
 def get_coordinates(db_path, description_condition, floor_condition):
 
     try:
@@ -31,13 +39,15 @@ def get_coordinates(db_path, description_condition, floor_condition):
             cursor.execute(query, (description_condition, floor_condition))
             return cursor.fetchall()
     except sqlite3.Error as e:
-        print(f"Database error: {e}")
+        logger.warning("Database error: %s", e)
     return None
 
 
 Place = tuple[str, tuple[float, float], int]
 
 
+@timed("db.find_places")
+@file_version.cached_by_file("db.find_places")
 def find_places(db_path, label, floor) -> list[Place]:
     """Anchors on a floor labelled `label`, as (label, (x, y), floor).
 
@@ -62,6 +72,8 @@ def find_places(db_path, label, floor) -> list[Place]:
     return [(description, (x, y), row_floor) for description, x, y, row_floor in rows]
 
 
+@timed("db.has_exact_label")
+@file_version.cached_by_file("db.has_exact_label")
 def has_exact_label(db_path, label) -> bool:
     """Whether some anchor's description or extra info is exactly `label`."""
     # sqlite3.Error propagates to the routing engine, which reports it
@@ -78,6 +90,8 @@ def has_exact_label(db_path, label) -> bool:
     return row is not None
 
 
+@timed("db.find_described")
+@file_version.cached_by_file("db.find_described")
 def find_described(
     db_path, descriptions
 ) -> list[tuple[int, tuple[float, float], str, str]]:
@@ -103,6 +117,8 @@ def find_described(
     ]
 
 
+@timed("db.find_places_anywhere")
+@file_version.cached_by_file("db.find_places_anywhere")
 def find_places_anywhere(db_path, label) -> list[Place]:
     """Anchors on any floor whose description or extra info contains `label`.
 
@@ -130,6 +146,8 @@ def find_places_anywhere(db_path, label) -> list[Place]:
     ]
 
 
+@timed("db.get_description")
+@file_version.cached_by_file("db.get_description")
 def get_description(db_path, coordinates, floor_condition):
 
     try:
@@ -144,7 +162,7 @@ def get_description(db_path, coordinates, floor_condition):
             cursor.execute(query, (*coordinates, floor_condition))
             return [row[0] for row in cursor.fetchall()]
     except sqlite3.Error as e:
-        print(f"Database error: {e}")
+        logger.warning("Database error: %s", e)
     return None
 
 
@@ -213,7 +231,7 @@ def get_password_users(db_path, username):
             return result[0] if result else None
 
     except sqlite3.Error as e:
-        print(f"Database error: {e}")
+        logger.warning("Database error: %s", e)
         return None
 
 
@@ -277,6 +295,8 @@ if __name__ == "__main__":
     check()
 
 
+@timed("db.get_connectors")
+@file_version.cached_by_file("db.get_connectors")
 def get_connectors(db_path, floor) -> list[tuple[str, tuple[float, float]]]:
     """Lifts and stairs on a floor as (trimmed description, (x, y))."""
     # sqlite3.Error propagates to the routing engine, which reports it

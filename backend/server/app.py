@@ -24,6 +24,7 @@ from Events_Management.event_management import user_events_router
 from Events_Management.event_view import events_router
 from Events_Management.user_management import users_router
 from Utils.loader import env_variables
+from Utils.log_setup import configure_from_env
 from Utils.route_types import BuildingFloorFiles
 from Utils.route_utilary import (
     add_teacher,
@@ -34,6 +35,9 @@ from Utils.route_utilary import (
     process_path_logic,
     retrieve_teachers,
 )
+from Utils.timing import TimingMiddleware
+
+configure_from_env()
 
 app = FastAPI()
 
@@ -45,6 +49,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# One log line and a Server-Timing header per request (stage timings, cache hits)
+app.add_middleware(TimingMiddleware)
 
 app.include_router(router=events_router, prefix="/events")
 app.include_router(router=users_router, prefix="/user")
@@ -151,8 +157,11 @@ async def load_svg(floor: str | None = None, building: str | None = None):
 
 
 @app.get("/load_shortest_path_svg")
-async def load_shortest_path_svg(floor: str | None = None, building: str | None = None):
-    return await load_shortest_path_svg_logic(floor, building)
+async def load_shortest_path_svg(
+    floor: str | None = None, building: str | None = None, route: str | None = None
+):
+    # `route` is the id in the map links returned by the route endpoints
+    return await load_shortest_path_svg_logic(floor, building, route)
 
 
 # process_path_logic / process_multi_building raise HTTPException on failure.

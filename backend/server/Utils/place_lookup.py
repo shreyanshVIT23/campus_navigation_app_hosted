@@ -7,11 +7,13 @@ toilets) and the map room that holds the cabin (e.g. "T022").
 """
 
 import contextlib
-import functools
 import re
 import sqlite3
 from pathlib import Path
 from typing import Literal, NamedTuple
+
+from . import file_version
+from .timing import timed
 
 ToiletKind = Literal["male", "female", "any"]
 Gender = Literal["male", "female"]
@@ -122,31 +124,17 @@ class Teacher(NamedTuple):
     room_no: str | None
 
 
+@timed("teachers")
 def load_teachers(teacher_db: str | Path | None) -> list[Teacher]:
     """Every teacher with a room; empty when there is no teacher database."""
     if teacher_db is None or not Path(teacher_db).is_file():
         return []
-    path = Path(teacher_db).resolve()
     # Re-read only when the file changes (teachers can be added at runtime)
-    return list(_read_teachers(path, _file_version(path)))
+    return _read_teachers(Path(teacher_db).resolve())
 
 
-def _file_version(path: Path) -> tuple[int, int, bytes]:
-    """Changes whenever the database is written.
-
-    The modified time alone can repeat for quick writes (Windows clock ticks), so
-    the SQLite header's file change counter (offset 24) is included: rollback-
-    journal databases increment it on every committed write.
-    https://www.sqlite.org/fileformat.html#file_change_counter
-    """
-    stat = path.stat()
-    with path.open("rb") as file:
-        header = file.read(28)
-    return stat.st_mtime_ns, stat.st_size, header[24:28]
-
-
-@functools.lru_cache(maxsize=8)
-def _read_teachers(path: Path, _version: tuple[int, int, bytes]) -> tuple[Teacher, ...]:
+@file_version.cached_by_file("teachers", maxsize=8)
+def _read_teachers(path: Path) -> list[Teacher]:
     uri = f"file:{path.as_posix()}?mode=ro"
     # sqlite3.Error propagates to the routing engine, which reports it
     with contextlib.closing(sqlite3.connect(uri, uri=True)) as conn:
@@ -154,7 +142,7 @@ def _read_teachers(path: Path, _version: tuple[int, int, bytes]) -> tuple[Teache
             "SELECT TRIM(name), TRIM(cabin_no), TRIM(room_no) FROM teachers"
             " WHERE room_no IS NOT NULL AND TRIM(room_no) != ''"
         ).fetchall()
-    return tuple(Teacher(name, cabin_no, room_no) for name, cabin_no, room_no in rows)
+    return [Teacher(name, cabin_no, room_no) for name, cabin_no, room_no in rows]
 
 
 def room_for_cabin(teachers: list[Teacher], text: str) -> str | None:

@@ -15,12 +15,10 @@ Usage (from backend/server):
 
 import argparse
 import contextlib
-import functools
 import io
 import json
 import math
 import re
-import tempfile
 import time
 from collections import defaultdict
 from collections.abc import Iterator
@@ -29,7 +27,7 @@ from typing import Literal
 
 from typing_extensions import TypedDict
 
-from . import db_shortest_path_maker, graph_converter, place_lookup, svg_manipulator
+from . import db_shortest_path_maker, place_lookup, svg_manipulator
 from .building_handling import get_building_paths
 from .loader import env_variables
 from .route_check import Anchor, MapData, same_length
@@ -218,17 +216,15 @@ def judge(
     return True, "SHORTER THAN THE INDEPENDENT SOLVE (checker or path bug)"
 
 
-def drawn_reason(floor_path, render_dir: Path, route: BuildingRoute) -> str | None:
+def drawn_reason(floor_path, route: BuildingRoute) -> str | None:
     """Why a successful route is not shown properly on its floor maps, or None."""
-    if route["complexity"] == "failed":
-        return None
-    legs = [route["path"]] if route["complexity"] == "simple" else route["path"]
+    legs = svg_manipulator.route_legs(route)
     try:
-        files = svg_manipulator.result_based_update(floor_path, str(render_dir), route)
+        maps = svg_manipulator.render_route(floor_path, route)
     except (IndexError, ValueError, OSError) as e:
         return f"NOT SHOWN: drawing failed ({type(e).__name__})"
-    for (_, points), svg_file in zip(legs, files, strict=True):
-        problems = MapData.drawn_problems(svg_file, points)
+    for (_, points), (_, svg) in zip(legs, maps, strict=True):
+        problems = MapData.drawn_problems(svg, points)
         if problems:
             return "NOT SHOWN: " + re.sub(r"\d+", "#", problems[0])
     return None
@@ -238,12 +234,12 @@ def audit(
     building: str,
     preference: str | None,
     teachers: list[place_lookup.Teacher],
-    render_dir: Path | None = None,
+    render: bool = False,
 ) -> AuditReport:
-    """Run every check; with `render_dir`, also draw and verify the maps of
-    toilet and teacher routes (written there, never to Output_Maps)."""
+    """Run every check; with `render`, also draw (in memory) and verify the maps
+    of toilet and teacher routes."""
     started = time.monotonic()
-    db_path, floor_path, _ = get_building_paths(building)
+    db_path, floor_path = get_building_paths(building)
     data = MapData(db_path)
     problems: dict[str, list[str]] = defaultdict(list)
     expected_failures: dict[str, list[str]] = defaultdict(list)
@@ -262,8 +258,8 @@ def audit(
                 db_path, check["start"], check["end"], preference
             )
         is_problem, reason = judge(data, check, route, preference)
-        if reason is None and render_dir is not None and check["kind"] != "room":
-            is_problem, reason = True, drawn_reason(floor_path, render_dir, route)
+        if reason is None and render and check["kind"] != "room":
+            is_problem, reason = True, drawn_reason(floor_path, route)
         if reason is None:
             continue
         if is_problem:
@@ -325,15 +321,9 @@ def main():
     parser.add_argument(
         "--render",
         action="store_true",
-        help="Also draw toilet and teacher routes (in a temp folder) and verify the maps",
+        help="Also draw toilet and teacher routes (in memory) and verify the maps",
     )
     args = parser.parse_args()
-
-    # Graphs are only read while auditing, so build each floor once instead of
-    # once per route. Patched here, not at import, so the app is never affected.
-    graph_converter.create_graph_from_db = functools.cache(
-        graph_converter.create_graph_from_db
-    )
 
     preferences = {
         "none": [None],
@@ -347,13 +337,7 @@ def main():
     reports = []
     for building in buildings:
         for preference in preferences:
-            with tempfile.TemporaryDirectory() as render_dir:
-                report = audit(
-                    building,
-                    preference,
-                    teachers,
-                    Path(render_dir) if args.render else None,
-                )
+            report = audit(building, preference, teachers, args.render)
             print_report(report)
             reports.append(report)
 

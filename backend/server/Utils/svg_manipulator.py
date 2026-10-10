@@ -3,12 +3,14 @@ import functools
 import itertools
 import os
 from pathlib import Path
+from typing import NamedTuple
 
 from lxml import etree as ET
 
-from . import db_shortest_path_maker, loader
+from . import db_shortest_path_maker, file_version, loader, route_maps
 from .building_handling import get_building_paths
-from .route_types import BuildingRoute, FailedRoute, MultiBuildingRoute
+from .route_types import BuildingRoute, FailedRoute, FloorPath, MultiBuildingRoute
+from .timing import timed
 
 SVG_NAMESPACE = "http://www.w3.org/2000/svg"
 NS = {"svg": SVG_NAMESPACE}
@@ -47,34 +49,96 @@ def route_segments(path_points) -> set[Segment]:
     return segments
 
 
-def modify_svg(svg_file, output_file, path_points):
+class FloorTemplate(NamedTuple):
+    # The floor map with walkway polylines split into lines, and every walkway
+    # already hidden and unstyled: a request only has to show its route's lines
+    svg: bytes
+    # Walkway line -> its position among the walkway <line>s, in document order.
+    # Shared by all requests: never modified.
+    lines_by_segment: dict[Segment, list[int]]
 
-    break_polyline_to_lines(svg_file, output_file)
 
-    tree = ET.parse(output_file)
-    root = tree.getroot()
+def walkway_group(root):
+    return root.find(".//svg:g[@id='Path']", namespaces=NS)
 
-    create_arrow_with_image(
-        root, path_points[-2], path_points[-1], image_href=pin_image_data_uri()
-    )
 
-    path_group = root.find(".//svg:g[@id='Path']", namespaces=NS)
+def walkway_lines(path_group) -> list:
+    return path_group.xpath(".//svg:line", namespaces=NS)
+
+
+def line_segment(line) -> Segment:
+    try:
+        return (
+            point_key(line.get("x1"), line.get("y1")),
+            point_key(line.get("x2"), line.get("y2")),
+        )
+    except (ValueError, TypeError) as e:
+        raise ValueError(
+            "Invalid line coordinates: 'x1', 'y1', 'x2', and 'y2' must be valid numbers."
+        ) from e
+
+
+@file_version.cached_by_file("svg_template", maxsize=32, copy_result=False)
+def floor_template(svg_file: str) -> FloorTemplate:
+    """The floor map, ready to draw a route on; built once per file version.
+
+    Kept as bytes, not a tree: each request parses its own copy (lxml frees the
+    GIL while parsing, and trees are never shared between threads, as the lxml
+    FAQ advises).
+    """
+    root = ET.parse(svg_file, ET.XMLParser(remove_blank_text=True)).getroot()
+    split_polylines(root)
+    lines_by_segment: dict[Segment, list[int]] = {}
+    path_group = walkway_group(root)
     if path_group is not None:
-        segments = route_segments(path_points)
         # The hiding class sits on the group and on walkways at every depth
         for element in path_group.iter():
             if isinstance(element.tag, str) and "class" in element.attrib:
                 del element.attrib["class"]
-        for line in path_group.xpath(".//svg:line", namespaces=NS):
-            modify_line(line, segments)
+        for position, line in enumerate(walkway_lines(path_group)):
+            line.set("visibility", "hidden")
+            lines_by_segment.setdefault(line_segment(line), []).append(position)
         # Curved/decorative walkway shapes are not part of the routing graph
         for shape in path_group.xpath(".//svg:path", namespaces=NS):
             shape.set("visibility", "hidden")
+    return FloorTemplate(ET.tostring(root), lines_by_segment)
 
-    with open(output_file, "wb") as f:
-        tree.write(f, pretty_print=True, xml_declaration=True, encoding="utf-8")
 
-    return output_file
+@timed("svg")
+def render_floor(svg_file: str, path_points) -> bytes:
+    """The floor map with the route drawn on it, as SVG bytes (no file is written)."""
+    with timed("svg.template"):
+        template = floor_template(svg_file)
+    with timed("svg.parse"):
+        root = ET.fromstring(template.svg, ET.XMLParser(remove_blank_text=True))
+    with timed("svg.draw"):
+        draw_route(root, path_points, template.lines_by_segment)
+    with timed("svg.serialize"):
+        return ET.tostring(
+            root.getroottree(),
+            pretty_print=True,
+            xml_declaration=True,
+            encoding="utf-8",
+        )
+
+
+def draw_route(root, path_points, lines_by_segment: dict[Segment, list[int]]):
+    """Show the route's walkway lines in red, and the pin at its end.
+
+    Every other walkway is already hidden in the template, so only the route's
+    own lines are touched.
+    """
+    create_arrow_with_image(
+        root, path_points[-2], path_points[-1], image_href=pin_image_data_uri()
+    )
+    path_group = walkway_group(root)
+    if path_group is None:
+        return
+    lines = walkway_lines(path_group)
+    for segment in route_segments(path_points):
+        for position in lines_by_segment.get(segment, ()):
+            lines[position].set("visibility", "visible")
+            lines[position].set("stroke", "red")
 
 
 def parse_svg_text(svg_file):
@@ -97,14 +161,9 @@ def parse_svg_text(svg_file):
     return text_data
 
 
-def break_polyline_to_lines(svg_file, output_file):
-
-    parser = ET.XMLParser(remove_blank_text=True)
-    tree = ET.parse(svg_file, parser)
-    root = tree.getroot()
-    namespace = {"svg": "http://www.w3.org/2000/svg"}
-
-    for polyline in root.xpath(".//svg:polyline", namespaces=namespace):
+def split_polylines(root):
+    """Replace each walkway polyline by one <line> per segment, in place."""
+    for polyline in root.xpath(".//svg:polyline", namespaces=NS):
         points = polyline.attrib.get("points", "").strip()
         if points:
             coords = [float(c) for c in points.replace(",", " ").split()]
@@ -131,8 +190,6 @@ def break_polyline_to_lines(svg_file, output_file):
                 parent.insert(parent.index(polyline), line)
 
             parent.remove(polyline)
-
-    tree.write(output_file, pretty_print=True, xml_declaration=True, encoding="utf-8")
 
 
 def create_arrow_with_image(
@@ -215,69 +272,47 @@ def create_arrow_with_image(
     svg_root.append(arrow_line)
 
 
-def modify_line(line, segments: set[Segment]):
-    """Show a walkway line in red if it is one hop of the route; hide it otherwise."""
-    try:
-        start = point_key(line.get("x1"), line.get("y1"))
-        end = point_key(line.get("x2"), line.get("y2"))
-    except (ValueError, TypeError) as e:
-        raise ValueError(
-            "Invalid line coordinates: 'x1', 'y1', 'x2', and 'y2' must be valid numbers."
-        ) from e
-
-    if (start, end) in segments:
-        line.set("visibility", "visible")
-        line.set("stroke", "red")
-    else:
-        line.set("visibility", "hidden")
-
-
-def output(val: int | str, output_map: str):
-    return os.path.join(output_map, f"floor {val} shortest path.svg")
-
-
-def floor_svg(val: int | str, floor_map: str):
+def floor_svg(val: int | str, floor_map: str | Path):
     return os.path.join(floor_map, f"floor {val} copy path.svg")
+
+
+def route_legs(route: BuildingRoute) -> list[FloorPath]:
+    if route["complexity"] == "simple":
+        return [route["path"]]
+    if route["complexity"] == "complex":
+        return route["path"]
+    return []
+
+
+def render_route(
+    floor_path: str | Path, route: BuildingRoute
+) -> list[tuple[int, bytes]]:
+    """Each floor of the route, drawn: [(floor, SVG bytes)] in walking order."""
+    return [
+        (floor, render_floor(floor_svg(floor, floor_path), points))
+        for floor, points in route_legs(route)
+    ]
 
 
 def main(
     start: str, end: str, building: str | None, preference: str | None = None
 ) -> BuildingRoute:
+    """Route within a building, with its maps drawn and stored (route["map_id"])."""
+    db_path, floor_path = get_building_paths(building)
 
-    db_path, floor_path, output_path = get_building_paths(building)
-
-    shortest_path = db_shortest_path_maker.main(
+    route = db_shortest_path_maker.main(
         db_path=db_path,
         start_description=start,
         end_description=end,
         preference=preference,
     )
-
-    result_based_update(floor_path, output_path, shortest_path)
-    return shortest_path
-
-
-def result_based_update(floor_path, output_path, shortest_path: BuildingRoute):
-    """Draw the route onto the floor SVGs; returns the written SVG paths."""
-    svg_updates: list[str] = []
-
-    if shortest_path["complexity"] == "complex":
-        for floor_no, points in shortest_path["path"]:
-            svg_updates.append(
-                modify_svg(
-                    floor_svg(floor_no, floor_path),
-                    output(floor_no, output_path),
-                    points,
-                )
-            )
-    elif shortest_path["complexity"] == "simple":
-        floor_no, points = shortest_path["path"]
-        svg_updates.append(
-            modify_svg(
-                floor_svg(floor_no, floor_path), output(floor_no, output_path), points
-            )
-        )
-    return svg_updates
+    # get_building_paths has refused a missing or unknown building already
+    if route["complexity"] != "failed" and building is not None:
+        maps = {
+            (building, floor): svg for floor, svg in render_route(floor_path, route)
+        }
+        route["map_id"] = route_maps.store.save(maps)
+    return route
 
 
 def multi_building_nav(
@@ -286,14 +321,11 @@ def multi_building_nav(
     building_name2: str,
     end_2: str,
 ) -> MultiBuildingRoute | FailedRoute:
-    db_path_1, floor_path_1, output_path_1 = get_building_paths(
-        building_name=building_name1
-    )
-    db_path_2, floor_path_2, output_path_2 = get_building_paths(
-        building_name=building_name2
-    )
+    """Route between buildings; both buildings' maps are stored under one id."""
+    db_path_1, floor_path_1 = get_building_paths(building_name=building_name1)
+    db_path_2, floor_path_2 = get_building_paths(building_name=building_name2)
 
-    shortest_path = db_shortest_path_maker.multi_building_nav(
+    route = db_shortest_path_maker.multi_building_nav(
         db_path_1=db_path_1,
         building_name1=building_name1,
         start_1=start_1,
@@ -301,21 +333,21 @@ def multi_building_nav(
         building_name2=building_name2,
         end_2=end_2,
     )
+    if route["complexity"] == "failed":
+        return route
 
-    if shortest_path["complexity"] == "failed":
-        return shortest_path
-
-    result_based_update(
-        floor_path=floor_path_1,
-        output_path=output_path_1,
-        shortest_path=shortest_path["path"][building_name1],
-    )
-    result_based_update(
-        floor_path=floor_path_2,
-        output_path=output_path_2,
-        shortest_path=shortest_path["path"][building_name2],
-    )
-    return shortest_path
+    maps: route_maps.FloorMaps = {}
+    for building, floor_path in (
+        (building_name1, floor_path_1),
+        (building_name2, floor_path_2),
+    ):
+        for floor, svg in render_route(floor_path, route["path"][building]):
+            maps[(building, floor)] = svg
+    route_id = route_maps.store.save(maps)
+    for leg in route["path"].values():
+        if leg["complexity"] != "failed":
+            leg["map_id"] = route_id
+    return route
 
 
 if __name__ == "__main__":

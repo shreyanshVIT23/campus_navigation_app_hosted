@@ -14,7 +14,6 @@ WRITABLE = (
     "event_db",
     "user_db_path",
     "teacher_des",
-    "output_map",
     "audio_path",
 )
 READ_ONLY = ("floor_map", "image_assets", "teacher_data")

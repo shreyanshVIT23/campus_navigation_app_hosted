@@ -299,13 +299,13 @@ class MapData:
     # ---- The route as drawn on the floor maps ----
 
     @staticmethod
-    def drawn_problems(svg_file: str | Path, points: list) -> list[str]:
+    def drawn_problems(svg: bytes, points: list) -> list[str]:
         """What is wrong with one floor leg as drawn by svg_manipulator.
 
         Every hop of the route must be a visible red walkway line, nothing else
         may be red, and the destination arrow/pin must be there.
         """
-        root = etree.parse(str(svg_file)).getroot()
+        root = etree.fromstring(svg)
         group = root.find(".//svg:g[@id='Path']", namespaces=SVG_NS)
         if group is None:
             return ["the floor map has no walkway group"]

@@ -1,8 +1,13 @@
+import logging
 import sqlite3
 
 import networkx as nx
 
+from . import file_version
 from .building_handling import get_building_paths
+from .timing import timed
+
+logger = logging.getLogger(__name__)
 
 
 def create_graph_from_svg_data(
@@ -40,7 +45,10 @@ def check_graph_connectivity(db_path, floor):
     return False, disconnected_components
 
 
+@timed("graph")
+@file_version.cached_by_file("graph", maxsize=64, copy_result=False)
 def create_graph_from_db(db_path, floor):
+    """The walkway graph of one floor; cached and frozen (nothing may change it)."""
 
     conn = sqlite3.connect(str(db_path))
     cursor = conn.cursor()
@@ -77,7 +85,8 @@ def create_graph_from_db(db_path, floor):
             point_a_id, point_b_id, distance = edge
             G.add_edge(point_a_id, point_b_id, weight=distance)
 
-        return G
+        # Shared by every request: adding or removing nodes/edges now raises
+        return nx.freeze(G)
     except sqlite3.Error as e:
         raise RuntimeError(f"Database error: {e}")
     finally:
@@ -96,7 +105,7 @@ def find_shortest_path(
         )
         return path, total_weight
     except nx.NetworkXNoPath:
-        print(f"No path found between {start} and {end}.")
+        logger.debug("No path found between %s and %s", start, end)
 
         return [], float("inf")
 

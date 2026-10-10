@@ -36,6 +36,7 @@ server/Old Utils/__pycache__/
 # Ignore output files or directories
 server/extracted_data.txt
 server/Chatbot/temp_audio
+server/logs/
 example_audio.wav
 api_test_log.txt
 api_test_log_events.txt

@@ -21,7 +21,6 @@ env_variables = {
     "db_path": resolve_path(os.getenv("DB_PATH")),
     "event_db": resolve_path(os.getenv("DB_EVENT")),
     "floor_map": resolve_path(os.getenv("FLOOR_MAPS_DIR")),
-    "output_map": resolve_path(os.getenv("OUTPUT_MAPS_DIR")),
     "user_db_path": resolve_path(os.getenv("DB_AUTH_PATH")),
     "teacher_data": resolve_path(os.getenv("EXCEL_TEACHER_PATH")),
     "image_assets": resolve_path(os.getenv("ASSETS_DIR")),

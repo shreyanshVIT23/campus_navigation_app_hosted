@@ -12,6 +12,8 @@ class SimpleRoute(TypedDict):
     total_weight: float
     complexity: Literal["simple"]
     error: None
+    # Set once the route's maps are drawn: the id they are served under
+    map_id: NotRequired[str]
 
 
 class ComplexRoute(TypedDict):
@@ -22,6 +24,8 @@ class ComplexRoute(TypedDict):
     error: None
     # Set when the lift/stairs preference could not be met and the other was used
     note: NotRequired[str]
+    # Set once the route's maps are drawn: the id they are served under
+    map_id: NotRequired[str]
 
 
 # Why a route failed: "input" = what was typed can't be used, "route" = the map

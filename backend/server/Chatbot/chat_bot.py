@@ -38,7 +38,10 @@ from langgraph.prebuilt.tool_node import ToolInvocationError
 from langgraph.types import CachePolicy
 from typing_extensions import NotRequired, TypedDict
 
+from Utils import timing
+from Utils.file_version import read_version
 from Utils.route_types import BuildingFloorFiles
+from Utils.timing import timed
 
 from .__init__ import env_variables
 from .navigation_tools import (
@@ -198,6 +201,8 @@ class Chatbot:
         llm: BaseChatModel | None = None,
         api_key: str | None = DEFAULT_API_KEY,
     ):
+        # Version first: a write during the load is still seen next time
+        self._knowledge_version = read_version(Path(db_path))
         self.knowledge = TeacherKnowledge(db_path)
         self.llm = llm if llm is not None else build_default_llm(api_key)
         self.tools = [*create_teacher_tools(self.knowledge), *create_navigation_tools()]
@@ -217,15 +222,28 @@ class Chatbot:
 
         self.graph = self._build_graph()
 
+    @timed("chat.reload")
     def reload_knowledge_base(self):
+        version = read_version(self.knowledge.db_path)
         self.knowledge.reload()
         self.response_cache.clear()
         self.graph.clear_cache()
+        self._knowledge_version = version
+
+    @timed("chat.freshness")
+    def _reload_if_teachers_changed(self):
+        # A teacher added or edited elsewhere (e.g. POST /teachers) must not get
+        # answers from caches built on the old data
+        unchanged = read_version(self.knowledge.db_path) == self._knowledge_version
+        timing.cache_event("teacher_knowledge", hit=unchanged)
+        if not unchanged:
+            self.reload_knowledge_base()
 
     # ============================================================
     # LANGGRAPH NODES
     # ============================================================
 
+    @timed("chat.transcribe")
     def transcribe_node(self, state: AgentState) -> AgentUpdate:
         audio = state.get("audio")
         transcript = self._transcribe(audio) if audio else ""
@@ -240,6 +258,7 @@ class Chatbot:
             "messages": [HumanMessage(content=transcript)],
         }
 
+    @timed("chat.agent")
     def agent_node(self, state: AgentState) -> AgentUpdate:
         if self.llm_with_tools is None:
             return {"llm_failed": True}
@@ -255,6 +274,7 @@ class Chatbot:
             update["tool_rounds"] = state.get("tool_rounds", 0) + 1
         return update
 
+    @timed("chat.fallback")
     def fallback_node(self, state: AgentState) -> AgentUpdate:
         answer, files = self.fallback_answer(state.get("user_input", ""))
         return {
@@ -382,6 +402,7 @@ class Chatbot:
     # ============================================================
 
     def chat(self, user_input: str) -> ChatResult:
+        self._reload_if_teachers_changed()
         cache_key = normalize_query(user_input)
         cached = self._get_cached_response(cache_key)
         if cached is not None:
@@ -397,6 +418,7 @@ class Chatbot:
         return result
 
     def chat_audio(self, audio_bytes: bytes, mime_type: str) -> ChatResult:
+        self._reload_if_teachers_changed()
         state: AgentState = {
             "messages": [],
             "audio": {

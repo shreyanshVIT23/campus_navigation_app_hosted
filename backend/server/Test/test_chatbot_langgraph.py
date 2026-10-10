@@ -19,6 +19,7 @@ import app as app_module
 from Chatbot import chat_bot as chat_bot_module
 from Chatbot import navigation_tools
 from Chatbot.chat_bot import Chatbot
+from Utils import timing
 from Utils.route_types import SimpleRoute
 
 EXPERIENCE_QUESTION = "how many years of experience does ravi verma have"
@@ -264,6 +265,64 @@ def test_reload_clears_caches_and_sees_new_teacher(bot, model, faculty_db):
     assert bot.respond("where is kavya iyer") == (
         "Kavya Iyer is a faculty member at VIT Bhopal (Cabin: D-303, Room: T503)."
     )
+
+
+def test_a_teacher_database_change_is_picked_up_without_a_reload(
+    bot, model, faculty_db
+):
+    profile_then_answer(model)
+    bot.respond("who is ravi verma")
+    assert len(bot.response_cache) == 1
+
+    # Written by someone else (e.g. POST /teachers); nobody calls reload
+    with sqlite3.connect(faculty_db) as conn:
+        conn.execute(
+            "INSERT INTO teachers (name, cabin_no, room_no) VALUES (?, ?, ?)",
+            ("kavya iyer", "D-303", "T503"),
+        )
+        conn.commit()
+
+    model.default = GEMINI_DOWN
+    assert bot.respond("where is kavya iyer") == (
+        "Kavya Iyer is a faculty member at VIT Bhopal (Cabin: D-303, Room: T503)."
+    )
+    # The stale answers were dropped too
+    assert "who is ravi verma" not in bot.response_cache
+
+
+def test_an_unchanged_teacher_database_keeps_the_caches(bot, model):
+    profile_then_answer(model)
+    bot.respond("who is ravi verma")
+    calls = len(model.calls)
+    bot.respond("who is ravi verma")
+    assert len(model.calls) == calls
+
+
+def test_freshness_checks_are_counted_and_reload_only_on_change(
+    bot, model, faculty_db, monkeypatch
+):
+    reloads = []
+    real_reload = bot.reload_knowledge_base
+    monkeypatch.setattr(
+        bot, "reload_knowledge_base", lambda: reloads.append(1) or real_reload()
+    )
+    timing.reset_cache_stats()
+    model.default = GEMINI_DOWN
+    for _ in range(3):
+        bot.respond("who is ravi verma")
+    assert reloads == []
+    assert timing.cache_stats()["teacher_knowledge"] == {"hits": 3, "misses": 0}
+
+    with sqlite3.connect(faculty_db) as conn:
+        conn.execute(
+            "INSERT INTO teachers (name, cabin_no, room_no) VALUES (?, ?, ?)",
+            ("kavya iyer", "D-303", "T503"),
+        )
+        conn.commit()
+    bot.respond("who is ravi verma")
+    bot.respond("who is ravi verma")
+    assert reloads == [1]
+    assert timing.cache_stats()["teacher_knowledge"] == {"hits": 4, "misses": 1}
 
 
 # ============================================================

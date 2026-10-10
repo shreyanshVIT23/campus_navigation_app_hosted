@@ -1,5 +1,6 @@
 import asyncio
 import io
+import logging
 import os
 import re
 import sqlite3
@@ -9,7 +10,7 @@ import nltk
 import spacy
 from fastapi import HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from rapidfuzz import fuzz, process
@@ -22,6 +23,8 @@ from Chatbot.transcription import recognize_wav
 from Utils.api_types import ErrorBody
 from Utils.route_types import PathFilesResponse
 
+logger = logging.getLogger(__name__)
+
 # Keys (including the space in "Phone Number") match the /search_teacher response
 TeacherMatch = TypedDict(
     "TeacherMatch",
@@ -33,7 +36,7 @@ TeacherMatch = TypedDict(
     },
 )
 
-PathProcessResult = tuple[PathFilesResponse | FileResponse | ErrorBody, int]
+PathProcessResult = tuple[PathFilesResponse | Response | ErrorBody, int]
 
 # NLTK data used here: word_tokenize -> punkt_tab, stopwords.words -> stopwords
 NLTK_RESOURCES = {
@@ -141,9 +144,9 @@ class AudioProcessor:
         try:
             file_content = resolved_path.read_bytes()
         except OSError as e:
-            print(f"Error opening file: {e}")
+            logger.warning("Could not open audio file %s: %s", resolved_path, e)
             return None
-        print(resolved_path.name)
+        logger.debug("Opened audio file %s", resolved_path.name)
         return FileStorage(io.BytesIO(file_content))
 
     async def process(
@@ -181,7 +184,7 @@ class AudioProcessor:
             if not audio_path_resolved.exists():
                 raise FileNotFoundError(f"Audio file not found: {audio_path_resolved}")
             query = self.audio_to_text(str(audio_path_resolved))
-            print(query)
+            logger.debug("Transcribed audio: %s", query)
             if "Error" in query:
                 return {"error": query}
 
@@ -192,7 +195,7 @@ class AudioProcessor:
             teacher = self.get_teacher_details_with_preprocessing(
                 query, resolved_db_path
             )
-            print("start: ", teacher)
+            logger.debug("Matched teacher for the start: %s", teacher)
             if "error" in teacher:
                 return teacher
             if not teacher["Room_No"]:

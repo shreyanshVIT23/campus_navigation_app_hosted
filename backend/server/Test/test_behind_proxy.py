@@ -137,3 +137,49 @@ def test_app_files_are_shipped(path):
 )
 def test_secrets_backups_and_tests_are_not_shipped(path):
     assert not is_shipped(path)
+
+
+# The image's own path settings: the build imports the app with no env_file
+
+PATH_SETTINGS = {
+    "DB_PATH": "DB/",
+    "DB_EVENT": "DB/event1.db",
+    "DB_AUTH_PATH": "DB/user_auth.db",
+    "DB_TEACHER_DATA": "DB/chatbot2.db",
+    "EXCEL_TEACHER_PATH": "Teacher_Data/faculty.xlsx",
+    "FLOOR_MAPS_DIR": "Floor_Maps",
+    "ASSETS_DIR": "Assets",
+    "AUDIO_DIR": "Chatbot/temp_audio",
+}
+
+
+def dockerfile_stage_env() -> dict[str, dict[str, str]]:
+    stages: dict[str, dict[str, str]] = {}
+    current: dict[str, str] = {}
+    for line in (backend_dir / "Dockerfile").read_text(encoding="utf-8").splitlines():
+        stage = re.match(r"FROM \S+ AS (\w+)", line)
+        if stage:
+            current = stages.setdefault(stage.group(1), {})
+        setting = re.match(r"ENV (\w+)=(\S+)", line)
+        if setting:
+            current[setting.group(1)] = setting.group(2)
+    return stages
+
+
+@pytest.mark.parametrize("stage", ["builder", "runtime"])
+def test_every_stage_sets_the_data_paths(stage):
+    env = dockerfile_stage_env()[stage]
+
+    assert {name: env.get(name) for name in PATH_SETTINGS} == PATH_SETTINGS
+
+
+# AUDIO_DIR is left out: it is created on the first voice request
+@pytest.mark.parametrize(
+    "relative",
+    sorted({value for name, value in PATH_SETTINGS.items() if name != "AUDIO_DIR"}),
+)
+def test_the_data_paths_are_shipped(relative):
+    path = f"server/{relative.rstrip('/')}"
+
+    assert (backend_dir / path).exists()
+    assert is_shipped(path)

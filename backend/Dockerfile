@@ -54,6 +54,18 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 
 WORKDIR /app/server
+
+# Data paths (relative to server/). .env files stay out of the image, so the
+# import check below needs them; at runtime compose env_file can override them.
+ENV DB_PATH=DB/
+ENV DB_EVENT=DB/event1.db
+ENV DB_AUTH_PATH=DB/user_auth.db
+ENV DB_TEACHER_DATA=DB/chatbot2.db
+ENV EXCEL_TEACHER_PATH=Teacher_Data/faculty.xlsx
+ENV FLOOR_MAPS_DIR=Floor_Maps
+ENV ASSETS_DIR=Assets
+ENV AUDIO_DIR=Chatbot/temp_audio
+
 RUN /app/.venv/bin/python -c "import app; print(\"IMPORT OK\")"
 
 # ============================================================
@@ -67,6 +79,16 @@ WORKDIR /app
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PATH="/app/.venv/bin:$PATH"
+
+# Data paths (relative to server/); secrets come from compose env_file.
+ENV DB_PATH=DB/
+ENV DB_EVENT=DB/event1.db
+ENV DB_AUTH_PATH=DB/user_auth.db
+ENV DB_TEACHER_DATA=DB/chatbot2.db
+ENV EXCEL_TEACHER_PATH=Teacher_Data/faculty.xlsx
+ENV FLOOR_MAPS_DIR=Floor_Maps
+ENV ASSETS_DIR=Assets
+ENV AUDIO_DIR=Chatbot/temp_audio
 
 # Create an unprivileged user.
 RUN useradd \

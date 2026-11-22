@@ -44,6 +44,11 @@ COPY . .
 
 ENV NODE_ENV=production
 
+# NEXT_PUBLIC_* values are inlined into the browser bundle at build time,
+# so the public API URL must be set here (compose build.args), not at runtime.
+ARG NEXT_PUBLIC_API_BASE_URL
+ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
+
 # Next.js collects completely anonymous telemetry data about general usage.
 # Learn more here: https://nextjs.org/telemetry
 # Uncomment the following line in case you want to disable telemetry during the build.

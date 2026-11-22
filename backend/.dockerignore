@@ -1,41 +1,54 @@
+# Patterns are anchored at the build context root; **/ makes them match at any depth.
+
+# Secrets: the container gets its environment from compose env_file
+**/.env
+**/.env.*
+**/.envrc
+
 # Byte-compiled files
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
+**/__pycache__/
+**/*.py[cod]
 
-# Environment files
-.env
+# Virtual environments and tool caches
+**/.venv/
+**/venv/
+**/env/
+**/.pytest_cache/
+**/.ruff_cache/
+**/.coverage
 
-# Virtual environments
-venv/
-env/
-.venv/
-
-# Git-related files
-.git
-.gitignore
-
-# Docker-related files
+# Git, Docker and editor files
+**/.git
+**/.gitignore
+**/.gitattributes
 Dockerfile
-docker-compose.yml
+**/docker-compose*.yml
+**/.vscode/
+**/.idea/
+**/.DS_Store
+**/.claude/
 
-# Local config files
-*.log
-*.db
-.DS_Store
-
-# Cache and temporary files
-*.bak
-*.swp
-*.tmp
-
-# IDE-specific files
-.vscode/
-.idea/
-
-# Documentation files
-*.md
+# Docs and logs
+**/*.md
 docs/
-.env.docker 
-.env
+**/*.log
+**/*_log.txt
+server/logs/
+
+# Tests and dev-only files
+server/Test/
+requirements.txt*
+**/*.bak
+**/*.swp
+**/*.tmp
+
+# Databases: only the ones the app runs on (backups and old copies stay out)
+server/DB/*
+!server/DB/ab01-01.db
+!server/DB/lab.db
+!server/DB/chatbot2.db
+!server/DB/event1.db
+!server/DB/user_auth.db
+
+# Recorded audio is per-request scratch
+server/Chatbot/temp_audio/*

@@ -319,10 +319,14 @@ def test_event_management_and_view_complete_routes(client):
     )
 
 
-def test_app_core_routes(client):
+def test_app_core_routes(client, auth_headers):
     # Test load_svg & load_shortest_path_svg
     res_svg = client.get("/load_svg", params={"floor": "1", "building": "AB-01"})
-    assert res_svg.status_code in (200, 400, 404, 500)
+    assert res_svg.status_code == 200
+    res_bad_building = client.get(
+        "/load_svg", params={"floor": "1", "building": "NOPE-99"}
+    )
+    assert res_bad_building.status_code == 400
 
     res_sp_svg = client.get(
         "/load_shortest_path_svg", params={"floor": "1", "building": "AB-01"}
@@ -348,8 +352,9 @@ def test_app_core_routes(client):
         "room_no": "101",
         "phone_number": "1234567890",
     }
-    res_add_t = client.post("/teachers", json=teacher_data)
-    assert res_add_t.status_code in (201, 400, 500)
+    assert client.post("/teachers", json=teacher_data).status_code == 401
+    res_add_t = client.post("/teachers", json=teacher_data, headers=auth_headers)
+    assert res_add_t.status_code in (201, 400)
 
     # Test path processing routes
     res_path = client.post(
@@ -397,13 +402,19 @@ def test_app_core_routes(client):
         res_fac_chat = client.post("/chat", json={"message": msg})
         assert res_fac_chat.status_code == 200
 
-    res_reload = client.post("/reload_knowledge")
-    assert res_reload.status_code in (200, 500)
+    assert client.post("/reload_knowledge").status_code == 401
+    res_reload = client.post("/reload_knowledge", headers=auth_headers)
+    assert res_reload.status_code == 200
 
     res_upload = client.post(
         "/upload", data={"text": "How do I get to room 301 from room 201?"}
     )
-    assert res_upload.status_code in (200, 400, 500)
+    assert res_upload.status_code == 200
+    res_upload_same_floor = client.post(
+        "/upload", data={"text": "How do I get to room 105 from room 101?"}
+    )
+    assert res_upload_same_floor.status_code == 200
+    assert res_upload_same_floor.headers["content-type"].startswith("image/svg+xml")
 
     # Test audio file upload using example_audio.wav
     audio_path = Path(__file__).resolve().parent / "example_audio.wav"

@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import (
+    Depends,
     FastAPI,
     File,
     Form,
@@ -12,7 +13,7 @@ from fastapi import (
 )
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import NotRequired, TypedDict
@@ -22,6 +23,7 @@ from Chatbot.chat_bot import Chatbot, ChatResult
 from Chatbot.transcription import GEMINI_AUDIO_MIME_TYPES, normalize_mime_type
 from Events_Management.event_management import user_events_router
 from Events_Management.event_view import events_router
+from Events_Management.user_auth_jwt import get_current_user
 from Events_Management.user_management import users_router
 from Utils.loader import env_variables
 from Utils.log_setup import configure_from_env
@@ -231,7 +233,8 @@ async def get_teachers(
     return await retrieve_teachers(name, cabin_no, room_no)
 
 
-@app.post("/teachers", status_code=201)
+# Only the cpanel adds teachers or reloads the chatbot, so both need a login
+@app.post("/teachers", status_code=201, dependencies=[Depends(get_current_user)])
 async def create_teacher(data: TeacherData):
     return await add_teacher(
         {
@@ -271,8 +274,8 @@ async def upload_audio(
     if isinstance(response, tuple) and len(response) == 2:
         result, status_code = response
 
-        # If result is a FileResponse, return it directly
-        if isinstance(result, FileResponse):
+        # A same-floor route answers with the map itself (an SVG Response)
+        if isinstance(result, Response):
             return result
 
         # Otherwise, return as JSON
@@ -331,7 +334,7 @@ async def chat_audio(audio_file: Annotated[UploadFile, File()]) -> ChatResponse:
     return chat_response(result)
 
 
-@app.post("/reload_knowledge")
+@app.post("/reload_knowledge", dependencies=[Depends(get_current_user)])
 async def reload_knowledge():
     chatbot.reload_knowledge_base()
     return {"message": "Knowledge base reloaded successfully", "status": "success"}

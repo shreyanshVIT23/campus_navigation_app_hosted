@@ -83,4 +83,8 @@ WORKDIR /app/server
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+# SWAG serves the API under /api and strips the prefix before forwarding;
+# root_path lets /api/docs find /api/openapi.json. Only SWAG reaches this
+# container (no published port), so its forwarded headers are trusted.
+# One worker: route maps live in this process's memory (Utils/route_maps).
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--root-path", "/api", "--forwarded-allow-ips", "*"]

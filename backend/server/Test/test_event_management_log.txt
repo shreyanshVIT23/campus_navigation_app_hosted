@@ -1,7 +1,7 @@
 === TEST SUITE LOG: test_event_management_log.txt ===
 
 ============================================================
-TIMESTAMP   : 2026-10-10T18:54:34.202746+05:30
+TIMESTAMP   : 2026-11-22T11:11:17.307756+05:30
 TESTED ROUTE: POST /user/register
 REQUEST DATA:
 {
@@ -17,7 +17,7 @@ RESPONSE:
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-10-10T18:54:35.689940+05:30
+TIMESTAMP   : 2026-11-22T11:11:18.352498+05:30
 TESTED ROUTE: POST /user/login
 REQUEST DATA:
 {
@@ -28,14 +28,14 @@ STATUS CODE : 200
 RESPONSE:
 {
   "message": "Login successful",
-  "last_login": "2026-10-10T18:54:35.672088+05:30",
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxNiIsImV4cCI6MTc5MTY0MDQ3NX0.JR9PP9WL-Y9c2FjVoZO1-XcdKAsMQuQV2ImSUR3pZtk",
+  "last_login": "2026-11-22T11:11:18.321812+05:30",
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxNiIsImV4cCI6MTc5NTMyNzg3OH0.SN5wo0-PG3tz_wG5CeQVx9x7l-5N4oR3RI98pvAWs-g",
   "token_type": "bearer"
 }
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-10-10T18:54:35.700630+05:30
+TIMESTAMP   : 2026-11-22T11:11:18.363545+05:30
 TESTED ROUTE: GET /events/
 REQUEST DATA: None
 STATUS CODE : 200
@@ -69,7 +69,7 @@ RESPONSE:
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-10-10T18:54:35.711116+05:30
+TIMESTAMP   : 2026-11-22T11:11:18.385544+05:30
 TESTED ROUTE: GET /user/events/
 REQUEST DATA: None
 STATUS CODE : 200
@@ -103,12 +103,12 @@ RESPONSE:
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-10-10T18:54:35.731054+05:30
+TIMESTAMP   : 2026-11-22T11:11:18.417554+05:30
 TESTED ROUTE: POST /user/events/
 REQUEST DATA:
 {
   "title": "Pytest Event",
-  "date": "2026-10-20",
+  "date": "2026-12-02",
   "time": "12:00",
   "location": "Pytest Room",
   "capacity": 20,
@@ -117,41 +117,41 @@ REQUEST DATA:
 STATUS CODE : 201
 RESPONSE:
 {
-  "id": "ef01a8e9-827f-45eb-9cc0-c285d0d0e631",
+  "id": "edc28e3c-4e62-426b-963c-f994671e8582",
   "title": "Pytest Event",
-  "date": "2026-10-20",
+  "date": "2026-12-02",
   "time": "12:00",
   "location": "Pytest Room",
   "capacity": 20,
   "description": "Created during pytest test run.",
-  "created_at": "2026-10-10T18:54:35.719778+05:30",
+  "created_at": "2026-11-22T11:11:18.400542+05:30",
   "user_id": 16
 }
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-10-10T18:54:35.743926+05:30
-TESTED ROUTE: GET /user/events/ef01a8e9-827f-45eb-9cc0-c285d0d0e631
+TIMESTAMP   : 2026-11-22T11:11:18.435066+05:30
+TESTED ROUTE: GET /user/events/edc28e3c-4e62-426b-963c-f994671e8582
 REQUEST DATA: None
 STATUS CODE : 200
 RESPONSE:
 {
-  "id": "ef01a8e9-827f-45eb-9cc0-c285d0d0e631",
+  "id": "edc28e3c-4e62-426b-963c-f994671e8582",
   "title": "Pytest Event",
-  "date": "2026-10-20",
+  "date": "2026-12-02",
   "time": "12:00",
   "location": "Pytest Room",
   "capacity": 20,
   "description": "Created during pytest test run.",
-  "created_at": "2026-10-10T18:54:35.719778+05:30",
+  "created_at": "2026-11-22T11:11:18.400542+05:30",
   "user_id": 16,
   "registered": 0
 }
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-10-10T18:54:35.771000+05:30
-TESTED ROUTE: PUT /user/events/ef01a8e9-827f-45eb-9cc0-c285d0d0e631
+TIMESTAMP   : 2026-11-22T11:11:18.470926+05:30
+TESTED ROUTE: PUT /user/events/edc28e3c-4e62-426b-963c-f994671e8582
 REQUEST DATA:
 {
   "title": "Updated Pytest Event"
@@ -159,40 +159,40 @@ REQUEST DATA:
 STATUS CODE : 200
 RESPONSE:
 {
-  "id": "ef01a8e9-827f-45eb-9cc0-c285d0d0e631",
+  "id": "edc28e3c-4e62-426b-963c-f994671e8582",
   "title": "Updated Pytest Event",
-  "date": "2026-10-20",
+  "date": "2026-12-02",
   "time": "12:00",
   "location": "Pytest Room",
   "capacity": 20,
   "description": "Created during pytest test run.",
-  "created_at": "2026-10-10T18:54:35.719778+05:30",
+  "created_at": "2026-11-22T11:11:18.400542+05:30",
   "user_id": 16,
   "registered": 0
 }
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-10-10T18:54:35.794736+05:30
-TESTED ROUTE: POST /events/ef01a8e9-827f-45eb-9cc0-c285d0d0e631/register
+TIMESTAMP   : 2026-11-22T11:11:18.497446+05:30
+TESTED ROUTE: POST /events/edc28e3c-4e62-426b-963c-f994671e8582/register
 REQUEST DATA:
 {
   "attendee_name": "Test Attendee",
-  "attendee_email": "attendee_185435@example.com"
+  "attendee_email": "attendee_111118@example.com"
 }
 STATUS CODE : 201
 RESPONSE:
 {
   "message": "Registration successful",
   "event": {
-    "id": "ef01a8e9-827f-45eb-9cc0-c285d0d0e631",
+    "id": "edc28e3c-4e62-426b-963c-f994671e8582",
     "title": "Updated Pytest Event",
-    "date": "2026-10-20",
+    "date": "2026-12-02",
     "time": "12:00",
     "location": "Pytest Room",
     "capacity": 20,
     "description": "Created during pytest test run.",
-    "created_at": "2026-10-10T18:54:35.719778+05:30",
+    "created_at": "2026-11-22T11:11:18.400542+05:30",
     "user_id": 16,
     "registered": 1
   }
@@ -200,24 +200,24 @@ RESPONSE:
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-10-10T18:54:35.809433+05:30
-TESTED ROUTE: GET /user/events/ef01a8e9-827f-45eb-9cc0-c285d0d0e631/attendees
+TIMESTAMP   : 2026-11-22T11:11:18.513474+05:30
+TESTED ROUTE: GET /user/events/edc28e3c-4e62-426b-963c-f994671e8582/attendees
 REQUEST DATA: None
 STATUS CODE : 200
 RESPONSE:
 [
   {
-    "id": "0686a8f0-3444-419b-848c-1fd04fdd801e",
+    "id": "5cff9bbe-aaab-47c1-b43b-43f74d9793b7",
     "attendee_name": "Test Attendee",
-    "attendee_email": "attendee_185435@example.com",
-    "registration_date": "2026-10-10T18:54:35.779071+05:30"
+    "attendee_email": "attendee_111118@example.com",
+    "registration_date": "2026-11-22T11:11:18.479932+05:30"
   }
 ]
 ============================================================
 
 ============================================================
-TIMESTAMP   : 2026-10-10T18:54:35.833604+05:30
-TESTED ROUTE: DELETE /user/events/ef01a8e9-827f-45eb-9cc0-c285d0d0e631
+TIMESTAMP   : 2026-11-22T11:11:18.532990+05:30
+TESTED ROUTE: DELETE /user/events/edc28e3c-4e62-426b-963c-f994671e8582
 REQUEST DATA: None
 STATUS CODE : 200
 RESPONSE:

@@ -1,4 +1,5 @@
 import asyncio
+import functools
 import io
 import logging
 import os
@@ -63,9 +64,15 @@ else:
     ensure_nltk_data()
 
 
+@functools.cache
+def english_model() -> spacy.language.Language:
+    # Loading takes a while, so every processor shares one read-only model
+    return spacy.load("en_core_web_sm")
+
+
 class AudioProcessor:
     def __init__(self):
-        self.nlp = spacy.load("en_core_web_sm")
+        self.nlp = english_model()
 
     def audio_to_text(self, file_path: str) -> str:
         if not Path(file_path).is_file():

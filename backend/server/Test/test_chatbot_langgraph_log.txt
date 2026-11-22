@@ -1,13 +1,35 @@
 === TEST SUITE LOG: test_chatbot_langgraph_log.txt ===
 
 ============================================================
-TIMESTAMP   : 2026-10-10T18:54:02.772593+05:30
-TESTED ROUTE: POST /reload_knowledge
-REQUEST DATA: None
+TIMESTAMP   : 2026-11-22T11:10:54.823172+05:30
+TESTED ROUTE: POST /user/register
+REQUEST DATA:
+{
+  "username": "pytest_user_auth",
+  "password": "TestPassword123!",
+  "email": "pytest_user_auth@example.com"
+}
+STATUS CODE : 409
+RESPONSE:
+{
+  "detail": "Username or email already exists"
+}
+============================================================
+
+============================================================
+TIMESTAMP   : 2026-11-22T11:10:55.223254+05:30
+TESTED ROUTE: POST /user/login
+REQUEST DATA:
+{
+  "username": "pytest_user_auth",
+  "password": "TestPassword123!"
+}
 STATUS CODE : 200
 RESPONSE:
 {
-  "message": "Knowledge base reloaded successfully",
-  "status": "success"
+  "message": "Login successful",
+  "last_login": "2026-11-22T11:10:55.216246+05:30",
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxNiIsImV4cCI6MTc5NTMyNzg1NX0.OONxS6Ui8WaumK2qDxEirfNVhCaIJTm_qk2XLto1sEk",
+  "token_type": "bearer"
 }
 ============================================================

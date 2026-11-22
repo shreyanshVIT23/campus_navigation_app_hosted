@@ -1,0 +1,47 @@
+=== TEST SUITE LOG: test_flow_report_fixes_log.txt ===
+
+============================================================
+TIMESTAMP   : 2026-11-22T11:11:20.854875+05:30
+TESTED ROUTE: POST /user/register
+REQUEST DATA:
+{
+  "username": "pytest_user_auth",
+  "password": "TestPassword123!",
+  "email": "pytest_user_auth@example.com"
+}
+STATUS CODE : 409
+RESPONSE:
+{
+  "detail": "Username or email already exists"
+}
+============================================================
+
+============================================================
+TIMESTAMP   : 2026-11-22T11:11:21.281554+05:30
+TESTED ROUTE: POST /user/login
+REQUEST DATA:
+{
+  "username": "pytest_user_auth",
+  "password": "TestPassword123!"
+}
+STATUS CODE : 200
+RESPONSE:
+{
+  "message": "Login successful",
+  "last_login": "2026-11-22T11:11:21.272704+05:30",
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxNiIsImV4cCI6MTc5NTMyNzg4MX0.cKjwDgUDOyISx-9aq0OUpLojK1n1KPj7IadS7Oik5Kc",
+  "token_type": "bearer"
+}
+============================================================
+
+============================================================
+TIMESTAMP   : 2026-11-22T11:11:21.345135+05:30
+TESTED ROUTE: POST /reload_knowledge
+REQUEST DATA: None
+STATUS CODE : 200
+RESPONSE:
+{
+  "message": "Knowledge base reloaded successfully",
+  "status": "success"
+}
+============================================================

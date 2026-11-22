@@ -50,7 +50,7 @@ def test_copies_hold_the_real_data():
     assert set(teacher_rows(real)) <= set(teacher_rows(env_variables["teacher_des"]))
 
 
-def test_adding_a_teacher_leaves_the_real_database_alone(client):
+def test_adding_a_teacher_leaves_the_real_database_alone(client, auth_headers):
     real = SERVER_DIR / "DB" / env_variables["teacher_des"].name
     real_before = teacher_count(real)
     copy_before = teacher_count(env_variables["teacher_des"])
@@ -63,6 +63,7 @@ def test_adding_a_teacher_leaves_the_real_database_alone(client):
             "room_no": "101",
             "phone_number": "0000000000",
         },
+        headers=auth_headers,
     )
 
     assert response.status_code == 201

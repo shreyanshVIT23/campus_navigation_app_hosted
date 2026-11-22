@@ -489,11 +489,12 @@ def test_chat_audio_missing_file_is_422(chat_client):
     assert chat_client.post("/chat/audio").status_code == 422
 
 
-def test_reload_knowledge_route_contract(chat_client, bot, model):
+def test_reload_knowledge_route_contract(chat_client, auth_headers, bot, model):
     profile_then_answer(model)
     bot.respond("who is ravi verma")
     assert len(bot.response_cache) == 1
-    response = chat_client.post("/reload_knowledge")
+    assert chat_client.post("/reload_knowledge").status_code == 401
+    response = chat_client.post("/reload_knowledge", headers=auth_headers)
     assert response.status_code == 200
     assert response.json() == {
         "message": "Knowledge base reloaded successfully",
@@ -502,13 +503,13 @@ def test_reload_knowledge_route_contract(chat_client, bot, model):
     assert len(bot.response_cache) == 0
 
 
-def test_reload_knowledge_route_error_shape(bot, monkeypatch):
+def test_reload_knowledge_route_error_shape(bot, auth_headers, monkeypatch):
     def broken_reload():
         raise RuntimeError("db locked")
 
     monkeypatch.setattr(app_module, "chatbot", bot)
     monkeypatch.setattr(bot, "reload_knowledge_base", broken_reload)
     with TestClient(app_module.app, raise_server_exceptions=False) as raw_client:
-        response = raw_client.post("/reload_knowledge")
+        response = raw_client.post("/reload_knowledge", headers=auth_headers)
     assert response.status_code == 500
     assert response.json() == {"detail": "Failed to reload knowledge base: db locked"}

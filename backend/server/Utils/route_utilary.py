@@ -1,7 +1,6 @@
 import logging
 import os
 import sqlite3
-from typing import Any
 
 from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
@@ -182,49 +181,13 @@ async def process_multi_building(
     }, 200
 
 
-async def prepare_custom_data(data: dict[str, Any]) -> PathRequest:
-    custom_type = data.get("type")
-    custom_start = data.get("start")
-    custom_end = data.get("end")
-    preference = data.get("preference")
-    building_name = data.get("building")
-
-    if not custom_type or not custom_start or not custom_end:
-        raise HTTPException(
-            status_code=400, detail="Missing required fields: type, start, or end"
-        )
-
-    if custom_type.lower() == "teacher cabin":
-        try:
-            # Cabins are listed in the teacher database, not the building's map
-            teacher_db = str(env_variables["teacher_des"])
-            start_room = get_room_no_by_cabin(custom_start, teacher_db) or custom_start
-            end_room = get_room_no_by_cabin(custom_end, teacher_db) or custom_end
-
-            return {
-                "start": start_room,
-                "end": end_room,
-                "preference": preference,
-                "building": building_name,
-            }
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e)) from e
-
-    return {
-        "start": custom_start,
-        "end": custom_end,
-        "preference": preference,
-        "building": building_name,
-    }
-
-
 async def load_svg_logic(floor: str | None, building: str | None) -> FileResponse:
     if not floor or not building:
         raise HTTPException(
             status_code=400, detail="Floor/Building parameter is required"
         )
 
-    _, floor_map = get_building_paths(building)
+    _, floor_map = get_building_paths(require_building(building))
 
     svg_path = floor_svg_location(floor, floor_map)
     if not os.path.exists(svg_path):

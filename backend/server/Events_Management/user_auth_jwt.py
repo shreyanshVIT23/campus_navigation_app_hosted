@@ -1,4 +1,7 @@
+import logging
 import os
+import secrets
+from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, HTTPException
@@ -7,7 +10,21 @@ from jose import JWTError, jwt
 
 from .helpers import get_db_connection
 
-SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-should-be-in-env-variables")
+logger = logging.getLogger(__name__)
+
+
+def load_secret_key(env: Mapping[str, str] = os.environ) -> str:
+    """SECRET_KEY from the environment, or a random key for this process only."""
+    key = env.get("SECRET_KEY", "").strip()
+    if key:
+        return key
+    logger.warning(
+        "SECRET_KEY is not set; using a random key, so logins end on restart"
+    )
+    return secrets.token_urlsafe(32)
+
+
+SECRET_KEY = load_secret_key()
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 

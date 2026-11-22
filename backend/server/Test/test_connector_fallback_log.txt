@@ -1,7 +1,7 @@
 === TEST SUITE LOG: test_connector_fallback_log.txt ===
 
 ============================================================
-TIMESTAMP   : 2026-10-10T18:54:32.673496+05:30
+TIMESTAMP   : 2026-11-22T11:11:16.856380+05:30
 TESTED ROUTE: POST /process_path
 REQUEST DATA:
 {
@@ -14,8 +14,8 @@ STATUS CODE : 200
 RESPONSE:
 {
   "files": {
-    "start_floor": "/load_shortest_path_svg?floor=1&building=Lab-Complex&route=f5d7b2c009015f345066497f98388aff",
-    "end_floor": "/load_shortest_path_svg?floor=2&building=Lab-Complex&route=f5d7b2c009015f345066497f98388aff"
+    "start_floor": "/load_shortest_path_svg?floor=1&building=Lab-Complex&route=9df10a8e0e809ac5b668ef95b5d6227b",
+    "end_floor": "/load_shortest_path_svg?floor=2&building=Lab-Complex&route=9df10a8e0e809ac5b668ef95b5d6227b"
   }
 }
 ============================================================
